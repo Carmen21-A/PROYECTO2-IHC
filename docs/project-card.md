@@ -10,8 +10,10 @@
 
 **Integrantes:** Carmen Jenifer Aranibar Fernandez
 
-- Modalidad P1: sin IA
-- Modalidad P2: con IA
+Modalidad P1: sin IA
 
-- Proyecto ejecutado: sí
-- Primer commit: ficha del proyecto
+Modalidad P2: con IA
+
+Proyecto ejecutado: sí
+
+Primer commit: ficha del proyecto

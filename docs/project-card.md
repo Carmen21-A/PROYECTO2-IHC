@@ -16,4 +16,4 @@ Modalidad P2: con IA
 
 Proyecto ejecutado: sí
 
-Primer commit: ficha del proyecto
+Primer commit: Tarjeta del proyecto

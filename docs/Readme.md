@@ -91,8 +91,9 @@ Contraseña = `estudiante123`
 
 La cuenta demo es de solo lectura, muestra datos de ejemplo, no permite registrar movimientos ni cambiar la contraseña. Para probar todo, crear una cuenta nueva con **"Crear Cuenta"**.
 
+## TAREA-2
 
-## 6. Pruebas Unitarias Automatizadas (Tarea 2)
+## 6. Pruebas Unitarias Automatizadas 
 
 Para ejecutar las 4 pruebas unitarias que verifican la regla de cambio de estado (`Pendiente` -> `Pagado` y acción `"Marcar como pagado"`) en la terminal pon:
 

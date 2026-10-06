@@ -17,7 +17,7 @@
           <img :src="iconSaldo" alt="" class="card-icon" />
           <div class="card-info">
             <span class="card-label">Saldo Disponible</span>
-            <span class="card-amount amount-navy">${{ saldoTotal.toFixed(2) }}</span>
+            <span class="card-amount amount-navy">{{ esDemo ? `$${saldoTotal.toFixed(2)}` : `${saldoTotal.toFixed(2)} Bs` }}</span>
             <span class="card-subtext">Actualizado hoy</span>
           </div>
         </div>
@@ -26,7 +26,7 @@
           <img :src="iconIngresos" alt="" class="card-icon" />
           <div class="card-info">
             <span class="card-label">Ingresos del Mes</span>
-            <span class="card-amount amount-sky">${{ ingresosTotal.toFixed(2) }}</span>
+            <span class="card-amount amount-sky">{{ esDemo ? `$${ingresosTotal.toFixed(2)}` : `${ingresosTotal.toFixed(2)} Bs` }}</span>
             <span class="card-subtext">Octubre 2026</span>
           </div>
         </div>
@@ -35,7 +35,7 @@
           <img :src="iconGastos" alt="" class="card-icon" />
           <div class="card-info">
             <span class="card-label">Gastos del Mes</span>
-            <span class="card-amount amount-danger">${{ gastosTotal.toFixed(2) }}</span>
+            <span class="card-amount amount-danger">{{ esDemo ? `$${gastosTotal.toFixed(2)}` : `${gastosTotal.toFixed(2)} Bs` }}</span>
             <span class="card-subtext">Octubre 2026</span>
           </div>
         </div>
@@ -53,7 +53,73 @@
         </button>
       </div>
 
-      <div class="table-card">
+      <div v-if="avisoEstado" class="aviso-estado" role="alert">{{ avisoEstado }}</div>
+
+      <!-- Tarjeta Principal de Movimientos para cuentas de usuario (Docente / IHC) -->
+      <div v-if="!esDemo" class="tarjeta-estudiantil-card">
+        <table class="tarjeta-estudiantil-table">
+          <thead>
+            <tr>
+              <th class="col-mov-header">MOVIMIENTO</th>
+              <th class="col-desc-header">DESCRIPCION</th>
+              <th class="col-fecha-header">FECHA</th>
+              <th class="col-estado-header text-center">ESTADO</th>
+              <th class="col-accion-header text-center">ACCIONES</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="listaMovimientos.length === 0" class="fila-vacia">
+              <td colspan="5" class="celda-vacia">
+                <div class="estado-vacio">
+                  <span class="emoji-vacio">💳</span>
+                  <p class="titulo-vacio">No hay movimientos registrados</p>
+                  <p class="subtitulo-vacio">Presiona el botón <strong>"+ Registrar Movimiento"</strong> para agregar tu primer gasto.</p>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-for="item in listaMovimientos" :key="item.id" class="fila-movimiento">
+              <td class="col-mov-dato">
+                <span :class="['badge-movimiento', item.tipo === 'ingreso' ? 'badge-ingreso-bs' : (item.estado === 'pagado' ? 'badge-gasto-bs' : 'badge-pendiente-monto')]">
+                  {{ formatearMovimientoTexto(item) }}
+                </span>
+              </td>
+              <td class="col-desc-dato">
+                {{ item.descripcion }}
+              </td>
+              <td class="col-fecha-dato">
+                {{ formatearFechaEspanol(item.fecha) }}
+              </td>
+              <td class="col-estado-dato text-center">
+                <span :class="['badge-estado-pill', item.estado === 'pagado' ? 'badge-estado-pagado' : 'badge-estado-pendiente']">
+                  {{ item.estado === 'pagado' ? 'Pagado' : 'Pendiente' }}
+                </span>
+              </td>
+              <td class="col-accion-dato text-center">
+                <button
+                  v-if="item.estado !== 'pagado'"
+                  type="button"
+                  class="btn-marcar-pagado"
+                  :disabled="actualizandoEstado === item.id"
+                  @click="marcarComoPagado(item)"
+                  title="Marcar como pagado"
+                >
+                  <span v-if="actualizandoEstado === item.id">Guardando...</span>
+                  <span v-else>Marcar como pagado</span>
+                </button>
+                <div v-else class="estado-pagado-check" title="Gasto pagado">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Tabla para la cuenta Demo (intacta) -->
+      <div v-else class="table-card">
         <table class="movimientos-table">
           <thead>
             <tr>
@@ -82,7 +148,8 @@
 
     </div>
 
-    <div v-if="abrirModal" class="modal-overlay" @click.self="abrirModal = false">
+    <!-- Modal en modo Demo (intacto, sin tocar) -->
+    <div v-if="abrirModal && esDemo" class="modal-overlay" @click.self="abrirModal = false">
       <div class="modal-card">
         <div class="modal-header">
           <h3>Registrar Nuevo Movimiento</h3>
@@ -153,6 +220,93 @@
       </div>
     </div>
 
+    <!-- Modal Dashboard: Registrar Gasto (Para Cuentas Normales) -->
+    <div v-if="abrirModal && !esDemo" class="modal-overlay" @click.self="cerrarModalGasto">
+      <div class="modal-card dashboard-modal-card">
+        <div class="dashboard-modal-header">
+          <div class="dashboard-header-left">
+            <div class="dashboard-icon-circle">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="1" x2="12" y2="23"></line>
+                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+              </svg>
+            </div>
+            <h2 class="dashboard-titulo">Gasto</h2>
+          </div>
+          <button @click="cerrarModalGasto" class="btn-close-modal" title="Cerrar">✕</button>
+        </div>
+
+        <p class="dashboard-subtitulo">Registra los detalles del gasto universitario</p>
+
+        <form @submit.prevent="guardarGastoEstudiantil" class="dashboard-form">
+          <!-- Campo Cantidad -->
+          <div class="form-grupo-custom">
+            <label class="form-label-custom">Cantidad:</label>
+            <div class="input-moneda-wrapper">
+              <span class="prefijo-bs">Bs</span>
+              <input
+                v-model.number="cantidadGasto"
+                type="number"
+                step="any"
+                min="0.01"
+                placeholder="25"
+                required
+                class="form-input-custom input-cantidad"
+              />
+            </div>
+          </div>
+
+          <!-- Campo Descripción -->
+          <div class="form-grupo-custom">
+            <label class="form-label-custom">Descripción:</label>
+            <input
+              v-model="descripcionGasto"
+              type="text"
+              placeholder="Transporte"
+              required
+              class="form-input-custom"
+            />
+          </div>
+
+          <!-- Fila Día y Mes -->
+          <div class="form-fila-fecha">
+            <div class="form-grupo-custom col-fecha-dia">
+              <label class="form-label-custom">Día:</label>
+              <input
+                v-model.number="diaGasto"
+                type="number"
+                min="1"
+                max="31"
+                placeholder="1"
+                required
+                class="form-input-custom text-center"
+              />
+            </div>
+
+            <div class="form-grupo-custom col-fecha-mes">
+              <label class="form-label-custom">Mes:</label>
+              <select v-model="mesGasto" class="form-input-custom select-mes-custom" required>
+                <option v-for="m in mesesDisponibles" :key="m" :value="m">
+                  {{ m }}
+                </option>
+              </select>
+            </div>
+          </div>
+
+          <p v-if="errorMsgGasto" class="form-error-custom">{{ errorMsgGasto }}</p>
+
+          <div class="dashboard-modal-actions">
+            <button type="button" @click="cerrarModalGasto" class="btn-cancelar-modal">
+              Cancelar
+            </button>
+            <button type="submit" class="btn-guardar-principal" :disabled="guardandoGasto">
+              {{ guardandoGasto ? 'Guardando...' : 'Guardar' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -163,11 +317,45 @@ import iconSaldo from '../assets/icon-saldo.png'
 import iconIngresos from '../assets/icon-ingresos.png'
 import iconGastos from '../assets/icon-gastos.png'
 
+// =========================================================================
+// SALDO BASE CONFIGURABLE:
+// Modifica aquí la cantidad (por defecto 700).
+// Si cambias este número en el código, se verá reflejado automáticamente
+// en el Saldo Disponible y se descontarán los gastos registrados.
+// =========================================================================
+const SALDO_BASE = 700
+
 const API_URL = 'http://localhost:8000'
 const router = useRouter()
 
 const usuarioActual = JSON.parse(localStorage.getItem('usuario') || '{}')
 const esDemo = usuarioActual.es_demo === true
+
+// Clave única para guardar los movimientos de cada usuario en localStorage
+const storageKey = computed(() => {
+  const email = usuarioActual.email || 'estudiante'
+  return `movimientos_${email}`
+})
+
+function guardarEnStorage(lista) {
+  if (!esDemo) {
+    try {
+      localStorage.setItem(storageKey.value, JSON.stringify(lista))
+    } catch (e) {
+      console.error('Error al guardar en localStorage:', e)
+    }
+  }
+}
+
+function cargarDeStorage() {
+  if (esDemo) return []
+  try {
+    const data = localStorage.getItem(storageKey.value)
+    return data ? JSON.parse(data) : []
+  } catch (e) {
+    return []
+  }
+}
 
 function salirDemo() {
   localStorage.removeItem('token')
@@ -182,11 +370,36 @@ const nuevaCategoria = ref('')
 const nuevoMonto = ref(null)
 const errorMsg = ref('')
 
-const listaMovimientos = ref([])
+// Inicia de inmediato con los movimientos almacenados localmente para evitar pérdida al recargar
+const listaMovimientos = ref(cargarDeStorage())
 const categorias = ref([])
-const ingresosTotal = ref(0)
-const gastosTotal = ref(0)
-const saldoTotal = ref(0)
+
+// Variables específicas para modo Demo
+const saldoDemo = ref(0)
+const ingresosDemo = ref(0)
+const gastosDemo = ref(0)
+
+// Gastos calculados automáticamente a partir de los movimientos (solo gastos pagados)
+const gastosTotal = computed(() => {
+  if (esDemo) return gastosDemo.value
+  return listaMovimientos.value
+    .filter(m => m.tipo === 'gasto' && m.estado === 'pagado')
+    .reduce((sum, item) => sum + Number(item.monto || 0), 0)
+})
+
+// Ingresos calculados automáticamente a partir de los movimientos
+const ingresosTotal = computed(() => {
+  if (esDemo) return ingresosDemo.value
+  return listaMovimientos.value
+    .filter(m => m.tipo === 'ingreso')
+    .reduce((sum, item) => sum + Number(item.monto || 0), 0)
+})
+
+// Saldo Disponible: SALDO_BASE (700) + Ingresos - Gastos
+const saldoTotal = computed(() => {
+  if (esDemo) return saldoDemo.value
+  return SALDO_BASE + ingresosTotal.value - gastosTotal.value
+})
 
 function authHeaders() {
   return {
@@ -202,18 +415,39 @@ function sesionExpirada() {
 }
 
 async function cargarMovimientos() {
-  const res = await fetch(`${API_URL}/movimientos`, { headers: authHeaders() })
-  if (res.status === 401) return sesionExpirada()
-  const data = await res.json()
-  listaMovimientos.value = data.movimientos
-  ingresosTotal.value = data.ingresos_del_mes
-  gastosTotal.value = data.gastos_del_mes
-  saldoTotal.value = data.saldo_disponible
+  try {
+    const res = await fetch(`${API_URL}/movimientos`, { headers: authHeaders() })
+    if (res.status === 401) return sesionExpirada()
+    if (res.ok) {
+      const data = await res.json()
+      if (esDemo) {
+        listaMovimientos.value = data.movimientos
+        saldoDemo.value = data.saldo_disponible
+        ingresosDemo.value = data.ingresos_del_mes
+        gastosDemo.value = data.gastos_del_mes
+      } else {
+        if (data.movimientos && data.movimientos.length > 0) {
+          listaMovimientos.value = data.movimientos
+          guardarEnStorage(data.movimientos)
+        } else if (listaMovimientos.value.length > 0) {
+          guardarEnStorage(listaMovimientos.value)
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Servidor offline: usando movimientos almacenados localmente.')
+  }
 }
 
 async function cargarCategorias() {
-  const res = await fetch(`${API_URL}/categorias`)
-  categorias.value = await res.json()
+  try {
+    const res = await fetch(`${API_URL}/categorias`)
+    if (res.ok) {
+      categorias.value = await res.json()
+    }
+  } catch (e) {
+    // Si no hay conexión de categorías, continuar normalmente
+  }
 }
 
 const categoriasDelTipo = computed(() => {
@@ -260,6 +494,151 @@ async function guardarMovimiento() {
     abrirModal.value = false
   } catch (e) {
     errorMsg.value = 'No se pudo conectar con el servidor.'
+  }
+}
+
+const mesesDisponibles = [
+  'Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
+  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'
+]
+
+const cantidadGasto = ref(null)
+const descripcionGasto = ref('')
+const diaGasto = ref(1)
+const mesGasto = ref('Octubre')
+const guardandoGasto = ref(false)
+const errorMsgGasto = ref('')
+
+function cerrarModalGasto() {
+  abrirModal.value = false
+  errorMsgGasto.value = ''
+}
+
+function formatearMovimientoTexto(item) {
+  const monto = Number(item.monto || 0)
+  const montoTexto = monto.toFixed(2)
+  if (item.tipo === 'ingreso') {
+    return `+${montoTexto} Bs`
+  }
+  return `-${montoTexto} Bs`
+}
+
+function formatearFechaEspanol(fechaStr) {
+  if (!fechaStr) return ''
+  if (fechaStr.toLowerCase().includes(' de ')) return fechaStr
+
+  if (fechaStr.includes('-')) {
+    const parts = fechaStr.split('-')
+    if (parts.length === 3) {
+      const dia = parseInt(parts[2], 10)
+      const mesNum = parseInt(parts[1], 10)
+      const mesNombre = mesesDisponibles[mesNum - 1] || 'Octubre'
+      return `${dia} de ${mesNombre}`
+    }
+  }
+  return fechaStr
+}
+
+async function guardarGastoEstudiantil() {
+  if (!cantidadGasto.value || !descripcionGasto.value) {
+    errorMsgGasto.value = 'Por favor completa la cantidad y la descripción.'
+    return
+  }
+
+  errorMsgGasto.value = ''
+  guardandoGasto.value = true
+
+  const diaNum = parseInt(diaGasto.value || 1, 10)
+  const diaStr = String(diaNum).padStart(2, '0')
+  const mesIdx = mesesDisponibles.indexOf(mesGasto.value) + 1
+  const mesStr = String(mesIdx > 0 ? mesIdx : 10).padStart(2, '0')
+  const anio = 2026
+  const fechaISO = `${anio}-${mesStr}-${diaStr}`
+
+  const nuevoGasto = {
+    id: Date.now(),
+    descripcion: descripcionGasto.value.trim(),
+    categoria: 'Transporte',
+    monto: Number(cantidadGasto.value),
+    tipo: 'gasto',
+    fecha: fechaISO,
+    estado: 'pendiente'
+  }
+
+  // Se añade de inmediato a la lista y se guarda en localStorage (no se pierde al recargar)
+  listaMovimientos.value = [nuevoGasto, ...listaMovimientos.value]
+  guardarEnStorage(listaMovimientos.value)
+
+  try {
+    const res = await fetch(`${API_URL}/movimientos`, {
+      method: 'POST',
+      headers: authHeaders(),
+      body: JSON.stringify({
+        descripcion: nuevoGasto.descripcion,
+        categoria: nuevoGasto.categoria,
+        monto: nuevoGasto.monto,
+        tipo: nuevoGasto.tipo,
+        fecha: nuevoGasto.fecha,
+        estado: 'pendiente'
+      })
+    })
+
+    if (res.status === 401) return sesionExpirada()
+    if (res.ok) {
+      const data = await res.json()
+      nuevoGasto.id = data.id
+      nuevoGasto.estado = data.estado || 'pendiente'
+      guardarEnStorage(listaMovimientos.value)
+    }
+  } catch (err) {
+    console.warn('Gasto guardado en almacenamiento local (servidor desconectado).')
+  } finally {
+    guardandoGasto.value = false
+    cantidadGasto.value = null
+    descripcionGasto.value = ''
+    diaGasto.value = 1
+    mesGasto.value = 'Octubre'
+    abrirModal.value = false
+  }
+}
+
+const actualizandoEstado = ref(null)
+const avisoEstado = ref('')
+let avisoTimer = null
+
+function mostrarAvisoEstado(texto) {
+  avisoEstado.value = texto
+  clearTimeout(avisoTimer)
+  avisoTimer = setTimeout(() => { avisoEstado.value = '' }, 5000)
+}
+
+async function marcarComoPagado(item) {
+  if (item.estado === 'pagado') return
+  actualizandoEstado.value = item.id
+
+  // 1. Transición de estado reactiva en frontend y almacenamiento local (persiste al recargar)
+  item.estado = 'pagado'
+  guardarEnStorage(listaMovimientos.value)
+
+  // 2. Persistencia en Backend / Base de Datos PostgreSQL
+  try {
+    const res = await fetch(`${API_URL}/movimientos/${item.id}/pagar`, {
+      method: 'PATCH',
+      headers: authHeaders()
+    })
+    if (res.status === 401) return sesionExpirada()
+    if (res.ok) {
+      const data = await res.json()
+      item.estado = data.estado || 'pagado'
+      guardarEnStorage(listaMovimientos.value)
+    } else if (res.status === 400) {
+      // Transición inválida: ya estaba pagado (por ejemplo, desde otra pestaña)
+      mostrarAvisoEstado('Transición inválida: el movimiento ya se encuentra en estado pagado.')
+    }
+  } catch (err) {
+    console.warn('Gasto marcado como pagado localmente (servidor no disponible).')
+  } finally {
+    actualizandoEstado.value = null
   }
 }
 
@@ -369,6 +748,16 @@ onMounted(() => {
 .btn-new-mov:disabled {
   background-color: #94A3B8;
   cursor: not-allowed;
+}
+
+.aviso-estado {
+  background-color: #FEF3C7;
+  border: 1px solid #FCD34D;
+  color: #92400E;
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: clamp(14px, 0.95vw, 16px);
+  margin-bottom: 20px;
 }
 
 .demo-banner {
@@ -578,12 +967,6 @@ onMounted(() => {
   border-color: var(--color-primary);
 }
 
-.form-row {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-}
-
 .modal-error {
   color: #DC2626;
   font-size: 14px;
@@ -617,6 +1000,346 @@ onMounted(() => {
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
+}
+
+/* --- TARJETA ESTUDIANTIL (Cuentas Normales - Requerido por el Docente) --- */
+.tarjeta-estudiantil-card {
+  background: #FFFFFF;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(15, 35, 65, 0.08);
+  overflow: hidden;
+  border: 1px solid #E2E8F0;
+}
+
+.tarjeta-estudiantil-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.tarjeta-estudiantil-table thead {
+  background-color: #F8FAFC;
+  border-bottom: 2px solid #E2E8F0;
+}
+
+.col-mov-header,
+.col-desc-header,
+.col-fecha-header,
+.col-estado-header,
+.col-accion-header {
+  padding: 18px 24px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #475569;
+  text-transform: uppercase;
+}
+
+.tarjeta-estudiantil-table td {
+  padding: 18px 24px;
+  border-bottom: 1px solid #F1F5F9;
+  vertical-align: middle;
+}
+
+.fila-movimiento:hover {
+  background-color: #F8FAFC;
+}
+
+.badge-movimiento {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 15px;
+  padding: 6px 14px;
+  border-radius: 6px;
+  letter-spacing: 0.02em;
+}
+
+.badge-gasto-bs {
+  background-color: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FECACA;
+}
+
+.badge-pendiente-monto {
+  background-color: #FEF3C7;
+  color: #B45309;
+  border: 1px solid #FDE68A;
+}
+
+.badge-ingreso-bs {
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #BBF7D0;
+}
+
+.col-estado-dato {
+  vertical-align: middle;
+}
+
+.badge-estado-pill {
+  display: inline-block;
+  font-weight: 700;
+  font-size: 13px;
+  padding: 6px 18px;
+  border-radius: 9999px;
+  letter-spacing: 0.02em;
+}
+
+.badge-estado-pendiente {
+  background-color: #FBBF24;
+  color: #78350F;
+  border: 1px solid #F59E0B;
+}
+
+.badge-estado-pagado {
+  background-color: #22C55E;
+  color: #FFFFFF;
+}
+
+.btn-marcar-pagado {
+  background-color: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  padding: 8px 22px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-marcar-pagado:hover:not(:disabled) {
+  background-color: #1D4ED8;
+  box-shadow: 0 4px 12px rgba(29, 78, 216, 0.35);
+  transform: translateY(-1px);
+}
+
+.btn-marcar-pagado:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.estado-pagado-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.col-desc-dato {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1E293B;
+}
+
+.col-fecha-dato {
+  font-size: 15px;
+  font-weight: 500;
+  color: #475569;
+}
+
+/* Estado vacío */
+.fila-vacia td {
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.estado-vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.emoji-vacio {
+  font-size: 36px;
+  margin-bottom: 4px;
+}
+
+.titulo-vacio {
+  font-size: 17px;
+  font-weight: 700;
+  color: #1E3350;
+  margin: 0;
+}
+
+.subtitulo-vacio {
+  font-size: 14px;
+  color: #64748B;
+  margin: 0;
+}
+
+/* --- DASHBOARD MODAL: REGISTRAR GASTO --- */
+.dashboard-modal-card {
+  max-width: 440px;
+  border-radius: 14px;
+  padding: 28px 32px;
+  box-shadow: 0 20px 40px rgba(15, 35, 65, 0.2);
+}
+
+.dashboard-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.dashboard-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-icon-circle {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background-color: #FEE2E2;
+  color: #DC2626;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-titulo {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1E3350;
+  margin: 0;
+}
+
+.dashboard-subtitulo {
+  font-size: 13px;
+  color: #64748B;
+  margin: 0 0 22px 0;
+}
+
+.dashboard-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.form-grupo-custom {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label-custom {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1E293B;
+}
+
+.input-moneda-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.prefijo-bs {
+  position: absolute;
+  left: 14px;
+  font-weight: 700;
+  font-size: 14px;
+  color: #64748B;
+  pointer-events: none;
+}
+
+.form-input-custom {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 14px;
+  border: 1.5px solid #CBD5E1;
+  border-radius: 8px;
+  background-color: #FFFFFF;
+  color: #1E293B;
+  transition: border-color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.form-input-custom:focus {
+  outline: none;
+  border-color: #2563EB;
+}
+
+.input-moneda-wrapper .input-cantidad {
+  padding-left: 42px;
+  font-weight: 600;
+}
+
+.form-fila-fecha {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 12px;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.select-mes-custom {
+  cursor: pointer;
+  appearance: auto;
+}
+
+.form-error-custom {
+  font-size: 13px;
+  color: #DC2626;
+  margin: 0;
+  background-color: #FEF2F2;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #DC2626;
+}
+
+.dashboard-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.btn-cancelar-modal {
+  background-color: #F1F5F9;
+  color: #475569;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-cancelar-modal:hover {
+  background-color: #E2E8F0;
+}
+
+.btn-guardar-principal {
+  background-color: #2563EB;
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+  box-shadow: 0 4px 10px rgba(37, 99, 235, 0.25);
+}
+
+.btn-guardar-principal:hover:not(:disabled) {
+  background-color: #1D4ED8;
+}
+
+.btn-guardar-principal:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 @media (max-width: 900px) {

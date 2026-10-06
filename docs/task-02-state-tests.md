@@ -2,7 +2,7 @@
 
 **Aplicación Asignada:** Presupuesto Estudiantil  
 **Estudiante:** Carmen Jenifer Aranibar Fernandez  
-**Materia:** Interacción Humano-Computador (IHC) - Proyecto 2  
+**Materia:** Interacción Hombre Computador (IHC) - Proyecto 2  
 **Modalidad:** P2 (con IA)  
 
 ---
@@ -51,7 +51,7 @@ Siguiendo las especificaciones de la **Tarea 2** para el proyecto **Presupuesto 
 2. **Esquemas Pydantic (`schemas.py`):**
    * `MovimientoCreate` y `MovimientoOut` incorporan el campo `estado`, garantizando que todo nuevo movimiento nazca por defecto en `"pendiente"`.
 3. **Endpoint de Transición (`routers/movimientos.py`):**
-   * Se habilitó el endpoint `PATCH /movimientos/{movimiento_id}/pagar`.
+   * Se habilitó el endpoint `PATCH /movimientos/{movimiento_id}/pagar` (también compatible con `PUT`).
    * Valida la existencia del movimiento y la pertenencia al usuario autenticado.
    * **Regla de negocio:** Si el movimiento ya está en estado `"pagado"`, rechaza la solicitud retornando un error **HTTP 400 Bad Request** con el mensaje descriptivo: *"Transición inválida: el movimiento ya se encuentra en estado pagado."*
    * Si es válido, actualiza el estado a `"pagado"` y guarda el cambio de forma permanente en PostgreSQL (`db.commit()`).
@@ -118,28 +118,4 @@ tests/test_estado_movimiento.py::test_04_demas_datos_del_elemento_se_conservan P
 
 ============================== 4 passed in 1.09s ===============================
 ```
-
 ---
-
-## 5. Guía para la Demostración en Video (Máximo 2 Minutos)
-
-Para grabar el video solicitado por el docente:
-
-1. **Abrir la aplicación web:**
-   * Navegar a `http://localhost:5173` e iniciar sesión.
-   * Ir a la vista **Mis Movimientos**.
-2. **Registrar y verificar estado inicial:**
-   * Presionar **`+ Registrar Movimiento`**, ingresar un gasto (ej. `25 Bs` - `Transporte U`) y guardar.
-   * Mostrar que aparece en la tabla con el badge **Pendiente** y el botón **`Marcar como pagado`**.
-3. **Ejecutar la transición:**
-   * Hacer clic en el botón azul **`Marcar como pagado`**.
-   * Señalar cómo cambia instantáneamente a **Pagado** (verde), el monto pasa a rojo y la acción muestra el check `✓`.
-4. **Comprobar persistencia:**
-   * Presionar **F5** (recargar la página en el navegador).
-   * Mostrar que el elemento sigue en estado **Pagado** tras la recarga.
-5. **Ejecutar las pruebas unitarias:**
-   * Abrir la terminal y ejecutar:
-     ```bash
-     python -m pytest -v tests/test_estado_movimiento.py -p no:warnings
-     ```
-   * Mostrar que las **4 pruebas unitarias pasan con éxito (100% PASSED)**.

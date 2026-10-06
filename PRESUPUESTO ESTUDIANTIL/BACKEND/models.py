@@ -41,6 +41,7 @@ class Movimiento(Base):
     tipo = Column(String(10), nullable=False)
     descripcion = Column(String(255), nullable=False)
     fecha = Column(Date, default=datetime.utcnow().date)
+    estado = Column(String(20), default="pendiente", nullable=False)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
     usuario = relationship("Usuario", back_populates="movimientos")

@@ -4,10 +4,20 @@ from database import engine, Base
 import models
 from routers import usuarios, movimientos, categorias
 
+from sqlalchemy import text, inspect
+
 try:
     Base.metadata.create_all(bind=engine)
+    inspector = inspect(engine)
+    if "movimientos" in inspector.get_table_names():
+        columnas = [c["name"] for c in inspector.get_columns("movimientos")]
+        if "estado" not in columnas:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE movimientos ADD COLUMN estado VARCHAR(20) DEFAULT 'pendiente' NOT NULL;"))
+                conn.commit()
+                print("[OK] Columna 'estado' agregada a tabla movimientos exitosamente.")
 except Exception as e:
-    print(f"Nota de conexión a la base de datos: {e}")
+    print(f"Nota de conexion a la base de datos: {e}")
 
 app = FastAPI(
     title="Presupuesto Estudiantil API",

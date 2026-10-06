@@ -19,11 +19,11 @@ engine = None
 try:
     test_engine = create_engine(DATABASE_URL, echo=False)
     with test_engine.connect() as conn:
-        print("✓ Conexión exitosa a PostgreSQL")
+        print("[OK] Conexion exitosa a PostgreSQL")
     engine = test_engine
 except Exception as err:
-    print(f"⚠️ Nota de PostgreSQL: {err}")
-    print("ℹ️ Usando almacenamiento local seguro (SQLite) mientras configuras tus credenciales de PostgreSQL en .env")
+    print(f"[Nota] PostgreSQL: {err}")
+    print("[Info] Usando almacenamiento local seguro (SQLite) mientras configuras tus credenciales de PostgreSQL en .env")
     engine = create_engine("sqlite:///./presupuesto.db", connect_args={"check_same_thread": False})
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

@@ -92,15 +92,36 @@ Contraseña = `estudiante123`
 La cuenta demo es de solo lectura, muestra datos de ejemplo, no permite registrar movimientos ni cambiar la contraseña. Para probar todo, crear una cuenta nueva con **"Crear Cuenta"**.
 
 
-## 6. Estructura del proyecto
+## 6. Pruebas Unitarias Automatizadas (Tarea 2)
+
+Para ejecutar las 4 pruebas unitarias que verifican la regla de cambio de estado (`Pendiente` -> `Pagado` y acción `"Marcar como pagado"`) en la terminal pon:
+
+```bash
+cd "PRESUPUESTO ESTUDIANTIL/BACKEND"
+python -m pytest -v tests/test_estado_movimiento.py -p no:warnings
+```
+
+Las pruebas validan automáticamente:
+1. `test_01_estado_inicial_es_correcto`: El estado inicial de un gasto nuevo es `pendiente`.
+2. `test_02_accion_realiza_transicion_esperada`: La acción `"Marcar como pagado"` cambia el estado a `pagado`.
+3. `test_03_transicion_invalida_se_rechaza`: Si un gasto ya está en `pagado`, la acción es rechazada con HTTP 400.
+4. `test_04_demas_datos_del_elemento_se_conservan`: El monto, descripción, fecha y usuario no se modifican al cambiar el estado.
+
+Para más detalles, consulta [task-02-state-tests.md](task-02-state-tests.md).
+
+---
+
+## 7. Estructura del proyecto
 
 ```
 PROYECTO2-IHC/
 ├── docs/
-│   ├── Readme.md                 ← este archivo (instalación y ejecución)
-│   └── task-01-access.md         ← modalidad, decisiones y archivos principales
+│   ├── README.md                 ← este archivo (instalación, ejecución y pruebas)
+│   ├── task-01-access.md         ← Documentación Tarea 1 (Manejo de acceso)
+│   └── task-02-state-tests.md    ← Documentación Tarea 2 (Máquina de estados y pruebas)
 └── PRESUPUESTO ESTUDIANTIL/
     ├── BASE DE DATOS/            ← schema.sql (tablas) y seed.sql (datos de ejemplo)
-    ├── BACKEND/                  ← Se uso API FastAPI 
-    └── FRONTEND/                 ← Se uso App Vue 3 
+    ├── BACKEND/                  ← API FastAPI, modelos, routers y tests/
+    │   └── tests/                ← test_estado_movimiento.py (4 pruebas unitarias)
+    └── FRONTEND/                 ← App Vue 3 (vistas, componentes y estilos)
 ```

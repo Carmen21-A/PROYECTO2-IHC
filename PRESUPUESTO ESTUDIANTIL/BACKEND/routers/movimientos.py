@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from typing import List
 from datetime import datetime
 from database import get_db
 import models
@@ -13,7 +12,7 @@ def bloquear_demo(usuario: models.Usuario):
     if usuario.es_demo:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Modo demo: no se pueden registrar ni eliminar movimientos."
+            detail="Modo demo: no se pueden registrar ni modificar movimientos."
         )
 
 @router.get("", response_model=schemas.ResumenFinanciero)
@@ -32,10 +31,12 @@ def listar_movimientos(
 
     for m in movimientos_db:
         monto_float = float(m.monto)
+        estado_val = getattr(m, "estado", "pendiente") or "pendiente"
         if m.tipo == "ingreso":
             ingresos += monto_float
         else:
-            gastos += monto_float
+            if estado_val == "pagado":
+                gastos += monto_float
 
         categoria_nombre = "General"
         if m.categoria_id:
@@ -49,7 +50,8 @@ def listar_movimientos(
             "categoria": categoria_nombre,
             "monto": monto_float,
             "tipo": m.tipo,
-            "fecha": m.fecha.strftime("%b %d") if hasattr(m.fecha, 'strftime') else str(m.fecha)
+            "fecha": m.fecha.strftime("%Y-%m-%d") if hasattr(m.fecha, 'strftime') else str(m.fecha),
+            "estado": estado_val
         })
 
     saldo = round(ingresos - gastos, 2)
@@ -69,16 +71,26 @@ def crear_movimiento(
 ):
     bloquear_demo(usuario)
 
-    cat = db.query(models.Categoria).filter(models.Categoria.nombre == datos.categoria).first()
+    cat = None
+    if datos.categoria:
+        cat = db.query(models.Categoria).filter(models.Categoria.nombre == datos.categoria).first()
     cat_id = cat.id if cat else None
+
+    fecha_val = datetime.utcnow().date()
+    if datos.fecha:
+        try:
+            fecha_val = datetime.strptime(datos.fecha, "%Y-%m-%d").date()
+        except Exception:
+            pass
 
     nuevo = models.Movimiento(
         usuario_id=usuario.id,
         categoria_id=cat_id,
         monto=datos.monto,
-        tipo=datos.tipo,
+        tipo=datos.tipo or "gasto",
         descripcion=datos.descripcion.strip(),
-        fecha=datetime.utcnow().date()
+        fecha=fecha_val,
+        estado=datos.estado or "pendiente"
     )
     db.add(nuevo)
     db.commit()
@@ -87,14 +99,15 @@ def crear_movimiento(
     return {
         "id": nuevo.id,
         "descripcion": nuevo.descripcion,
-        "categoria": datos.categoria,
+        "categoria": cat.nombre if cat else (datos.categoria or "General"),
         "monto": float(nuevo.monto),
         "tipo": nuevo.tipo,
-        "fecha": nuevo.fecha.strftime("%b %d")
+        "fecha": nuevo.fecha.strftime("%Y-%m-%d") if hasattr(nuevo.fecha, 'strftime') else str(nuevo.fecha),
+        "estado": nuevo.estado
     }
 
-@router.delete("/{movimiento_id}")
-def eliminar_movimiento(
+@router.patch("/{movimiento_id}/pagar", response_model=schemas.MovimientoOut)
+def marcar_como_pagado(
     movimiento_id: int,
     db: Session = Depends(get_db),
     usuario: models.Usuario = Depends(get_current_user)
@@ -109,6 +122,28 @@ def eliminar_movimiento(
     if not mov:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado.")
 
-    db.delete(mov)
+    if getattr(mov, "estado", "pendiente") == "pagado":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Transición inválida: el movimiento ya se encuentra en estado pagado."
+        )
+
+    mov.estado = "pagado"
     db.commit()
-    return {"mensaje": "Movimiento eliminado exitosamente."}
+    db.refresh(mov)
+
+    categoria_nombre = "General"
+    if mov.categoria_id:
+        cat = db.query(models.Categoria).filter(models.Categoria.id == mov.categoria_id).first()
+        if cat:
+            categoria_nombre = cat.nombre
+
+    return {
+        "id": mov.id,
+        "descripcion": mov.descripcion,
+        "categoria": categoria_nombre,
+        "monto": float(mov.monto),
+        "tipo": mov.tipo,
+        "fecha": mov.fecha.strftime("%Y-%m-%d") if hasattr(mov.fecha, 'strftime') else str(mov.fecha),
+        "estado": mov.estado
+    }

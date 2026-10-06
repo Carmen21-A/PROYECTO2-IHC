@@ -1,6 +1,5 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional, List
-from datetime import date, datetime
 
 class UsuarioRegistro(BaseModel):
     nombre: str
@@ -38,10 +37,11 @@ class RestablecerPassword(BaseModel):
 
 class MovimientoCreate(BaseModel):
     descripcion: str
-    categoria: str
+    categoria: Optional[str] = "General"
     monto: float
-    tipo: str
+    tipo: Optional[str] = "gasto"
     fecha: Optional[str] = None
+    estado: Optional[str] = "pendiente"
 
 class MovimientoOut(BaseModel):
     id: int
@@ -50,6 +50,7 @@ class MovimientoOut(BaseModel):
     monto: float
     tipo: str
     fecha: str
+    estado: str = "pendiente"
 
     class Config:
         from_attributes = True

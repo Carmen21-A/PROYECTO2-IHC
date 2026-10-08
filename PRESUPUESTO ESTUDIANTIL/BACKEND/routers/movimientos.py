@@ -15,6 +15,45 @@ def bloquear_demo(usuario: models.Usuario):
             detail="Modo demo: no se pueden registrar ni modificar movimientos."
         )
 
+MENSAJE_MONTO_BLOQUEADO = (
+    "No se puede modificar el monto: este movimiento ya está pagado. "
+    "Solo puedes cambiar la descripción y la fecha."
+)
+
+def validar_edicion(mov: models.Movimiento, datos: schemas.MovimientoUpdate):
+    """Regla de estado (Tarea 3): un movimiento pagado no permite modificar su monto."""
+    estado_actual = getattr(mov, "estado", "pendiente") or "pendiente"
+    if estado_actual == "pagado" and datos.monto is not None             and round(float(datos.monto), 2) != round(float(mov.monto), 2):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=MENSAJE_MONTO_BLOQUEADO
+        )
+
+def obtener_movimiento_propio(movimiento_id: int, db: Session, usuario: models.Usuario) -> models.Movimiento:
+    mov = db.query(models.Movimiento).filter(
+        models.Movimiento.id == movimiento_id,
+        models.Movimiento.usuario_id == usuario.id
+    ).first()
+    if not mov:
+        raise HTTPException(status_code=404, detail="Movimiento no encontrado.")
+    return mov
+
+def serializar_movimiento(mov: models.Movimiento, db: Session) -> dict:
+    categoria_nombre = "General"
+    if mov.categoria_id:
+        cat = db.query(models.Categoria).filter(models.Categoria.id == mov.categoria_id).first()
+        if cat:
+            categoria_nombre = cat.nombre
+    return {
+        "id": mov.id,
+        "descripcion": mov.descripcion,
+        "categoria": categoria_nombre,
+        "monto": float(mov.monto),
+        "tipo": mov.tipo,
+        "fecha": mov.fecha.strftime("%Y-%m-%d") if hasattr(mov.fecha, 'strftime') else str(mov.fecha),
+        "estado": getattr(mov, "estado", "pendiente") or "pendiente"
+    }
+
 @router.get("", response_model=schemas.ResumenFinanciero)
 def listar_movimientos(
     db: Session = Depends(get_db),
@@ -147,3 +186,48 @@ def marcar_como_pagado(
         "fecha": mov.fecha.strftime("%Y-%m-%d") if hasattr(mov.fecha, 'strftime') else str(mov.fecha),
         "estado": mov.estado
     }
+
+@router.put("/{movimiento_id}", response_model=schemas.MovimientoOut)
+def editar_movimiento(
+    movimiento_id: int,
+    datos: schemas.MovimientoUpdate,
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(get_current_user)
+):
+    bloquear_demo(usuario)
+    mov = obtener_movimiento_propio(movimiento_id, db, usuario)
+
+    validar_edicion(mov, datos)
+
+    if datos.descripcion is not None:
+        descripcion = datos.descripcion.strip()
+        if not descripcion:
+            raise HTTPException(status_code=400, detail="La descripción no puede estar vacía.")
+        mov.descripcion = descripcion
+
+    if datos.monto is not None:
+        if datos.monto <= 0:
+            raise HTTPException(status_code=400, detail="El monto debe ser mayor a 0.")
+        mov.monto = datos.monto
+
+    if datos.fecha:
+        try:
+            mov.fecha = datetime.strptime(datos.fecha, "%Y-%m-%d").date()
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Fecha inválida. Usa el formato AAAA-MM-DD.")
+
+    db.commit()
+    db.refresh(mov)
+    return serializar_movimiento(mov, db)
+
+@router.delete("/{movimiento_id}")
+def eliminar_movimiento(
+    movimiento_id: int,
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(get_current_user)
+):
+    bloquear_demo(usuario)
+    mov = obtener_movimiento_propio(movimiento_id, db, usuario)
+    db.delete(mov)
+    db.commit()
+    return {"ok": True, "id": movimiento_id}

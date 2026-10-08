@@ -43,6 +43,11 @@ class MovimientoCreate(BaseModel):
     fecha: Optional[str] = None
     estado: Optional[str] = "pendiente"
 
+class MovimientoUpdate(BaseModel):
+    descripcion: Optional[str] = None
+    monto: Optional[float] = None
+    fecha: Optional[str] = None
+
 class MovimientoOut(BaseModel):
     id: int
     descripcion: str

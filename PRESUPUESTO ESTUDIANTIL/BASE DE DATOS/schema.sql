@@ -32,6 +32,7 @@ CREATE TABLE movimientos (
     tipo VARCHAR(10) NOT NULL CHECK (tipo IN ('ingreso', 'gasto')),
     descripcion VARCHAR(255) NOT NULL,
     fecha DATE NOT NULL DEFAULT CURRENT_DATE,
+    estado VARCHAR(20) NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'pagado')),
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

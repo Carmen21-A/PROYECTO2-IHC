@@ -96,6 +96,7 @@
                 </span>
               </td>
               <td class="col-accion-dato text-center">
+                <div class="acciones-fila">
                 <button
                   v-if="item.estado !== 'pagado'"
                   type="button"
@@ -111,6 +112,23 @@
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
                     <polyline points="20 6 9 17 4 12"></polyline>
                   </svg>
+                </div>
+                <button
+                  type="button"
+                  class="btn-accion btn-editar"
+                  @click="abrirEdicion(item)"
+                  :aria-label="`Editar ${item.descripcion}`"
+                >
+                  Editar
+                </button>
+                <button
+                  type="button"
+                  class="btn-accion btn-eliminar"
+                  @click="pedirConfirmacionEliminar(item)"
+                  :aria-label="`Eliminar ${item.descripcion}`"
+                >
+                  Eliminar
+                </button>
                 </div>
               </td>
             </tr>
@@ -307,11 +325,136 @@
       </div>
     </div>
 
+    <!-- Modal: Editar Movimiento (Tarea 3) -->
+    <div v-if="movimientoEditando" class="modal-overlay" @click.self="cerrarEdicion">
+      <div class="modal-card dashboard-modal-card">
+        <div class="dashboard-modal-header">
+          <div class="dashboard-header-left">
+            <div class="dashboard-icon-circle icon-editar">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 20h9"></path>
+                <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"></path>
+              </svg>
+            </div>
+            <h2 class="dashboard-titulo">Editar gasto</h2>
+          </div>
+          <button @click="cerrarEdicion" class="btn-close-modal" title="Cerrar">✕</button>
+        </div>
+
+        <p class="dashboard-subtitulo">
+          Estado actual:
+          <span :class="['badge-estado-pill', movimientoEditando.estado === 'pagado' ? 'badge-estado-pagado' : 'badge-estado-pendiente']">
+            {{ movimientoEditando.estado === 'pagado' ? 'Pagado' : 'Pendiente' }}
+          </span>
+        </p>
+
+        <form @submit.prevent="guardarEdicion" class="dashboard-form">
+          <div class="form-grupo-custom">
+            <label class="form-label-custom" for="editar-cantidad">Cantidad:</label>
+            <div class="input-moneda-wrapper">
+              <span class="prefijo-bs">Bs</span>
+              <input
+                id="editar-cantidad"
+                v-model.number="editCantidad"
+                type="number"
+                step="any"
+                min="0.01"
+                required
+                :disabled="montoBloqueado"
+                :aria-describedby="montoBloqueado ? 'motivo-monto-bloqueado' : undefined"
+                class="form-input-custom input-cantidad"
+              />
+            </div>
+            <p v-if="montoBloqueado" id="motivo-monto-bloqueado" class="aviso-bloqueo">
+              🔒 Este gasto ya está <strong>pagado</strong>, por eso su monto no se puede modificar.
+              Puedes cambiar la descripción y la fecha.
+            </p>
+          </div>
+
+          <div class="form-grupo-custom">
+            <label class="form-label-custom" for="editar-descripcion">Descripción:</label>
+            <input
+              id="editar-descripcion"
+              v-model="editDescripcion"
+              type="text"
+              required
+              class="form-input-custom"
+            />
+          </div>
+
+          <div class="form-fila-fecha">
+            <div class="form-grupo-custom col-fecha-dia">
+              <label class="form-label-custom" for="editar-dia">Día:</label>
+              <input
+                id="editar-dia"
+                v-model.number="editDia"
+                type="number"
+                min="1"
+                max="31"
+                required
+                class="form-input-custom text-center"
+              />
+            </div>
+            <div class="form-grupo-custom col-fecha-mes">
+              <label class="form-label-custom" for="editar-mes">Mes:</label>
+              <select id="editar-mes" v-model="editMes" class="form-input-custom select-mes-custom" required>
+                <option v-for="m in mesesDisponibles" :key="m" :value="m">{{ m }}</option>
+              </select>
+            </div>
+          </div>
+
+          <p v-if="errorEdicion" class="form-error-custom" role="alert">{{ errorEdicion }}</p>
+
+          <div class="dashboard-modal-actions">
+            <button type="button" @click="cerrarEdicion" class="btn-cancelar-modal">Cancelar</button>
+            <button type="submit" class="btn-guardar-principal" :disabled="guardandoEdicion">
+              {{ guardandoEdicion ? 'Guardando...' : 'Guardar cambios' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Modal: Confirmar Eliminación (Tarea 3) -->
+    <div v-if="movimientoAEliminar" class="modal-overlay" @click.self="cancelarEliminar">
+      <div class="modal-card dashboard-modal-card" role="alertdialog" aria-labelledby="titulo-eliminar" aria-describedby="texto-eliminar">
+        <div class="dashboard-modal-header">
+          <div class="dashboard-header-left">
+            <div class="dashboard-icon-circle">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="3 6 5 6 21 6"></polyline>
+                <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path>
+                <path d="M10 11v6M14 11v6"></path>
+                <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"></path>
+              </svg>
+            </div>
+            <h2 id="titulo-eliminar" class="dashboard-titulo">¿Eliminar gasto?</h2>
+          </div>
+        </div>
+
+        <p id="texto-eliminar" class="texto-confirmar">
+          Vas a eliminar <strong>"{{ movimientoAEliminar.descripcion }}"</strong>
+          por <strong>{{ formatearMovimientoTexto(movimientoAEliminar) }}</strong>
+          del {{ formatearFechaEspanol(movimientoAEliminar.fecha) }}.
+          Esta acción no se puede deshacer.
+        </p>
+
+        <p v-if="errorEliminar" class="form-error-custom" role="alert">{{ errorEliminar }}</p>
+
+        <div class="dashboard-modal-actions">
+          <button type="button" @click="cancelarEliminar" class="btn-cancelar-modal">Cancelar</button>
+          <button type="button" class="btn-confirmar-eliminar" :disabled="eliminando" @click="confirmarEliminar">
+            {{ eliminando ? 'Eliminando...' : 'Sí, eliminar' }}
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import iconSaldo from '../assets/icon-saldo.png'
 import iconIngresos from '../assets/icon-ingresos.png'
@@ -426,12 +569,10 @@ async function cargarMovimientos() {
         ingresosDemo.value = data.ingresos_del_mes
         gastosDemo.value = data.gastos_del_mes
       } else {
-        if (data.movimientos && data.movimientos.length > 0) {
-          listaMovimientos.value = data.movimientos
-          guardarEnStorage(data.movimientos)
-        } else if (listaMovimientos.value.length > 0) {
-          guardarEnStorage(listaMovimientos.value)
-        }
+        // La base de datos es la fuente de verdad: así las ediciones y
+        // eliminaciones se mantienen tal cual después de recargar
+        listaMovimientos.value = data.movimientos || []
+        guardarEnStorage(listaMovimientos.value)
       }
     }
   } catch (e) {
@@ -589,6 +730,8 @@ async function guardarGastoEstudiantil() {
       nuevoGasto.id = data.id
       nuevoGasto.estado = data.estado || 'pendiente'
       guardarEnStorage(listaMovimientos.value)
+      avisarOtrasPestanas('creado', nuevoGasto.descripcion)
+      await sincronizarDesdeServidor(`Se registró "${nuevoGasto.descripcion}".`)
     }
   } catch (err) {
     console.warn('Gasto guardado en almacenamiento local (servidor desconectado).')
@@ -609,7 +752,7 @@ let avisoTimer = null
 function mostrarAvisoEstado(texto) {
   avisoEstado.value = texto
   clearTimeout(avisoTimer)
-  avisoTimer = setTimeout(() => { avisoEstado.value = '' }, 5000)
+  avisoTimer = setTimeout(() => { avisoEstado.value = '' }, 8000)
 }
 
 async function marcarComoPagado(item) {
@@ -642,9 +785,213 @@ async function marcarComoPagado(item) {
   }
 }
 
+// ===================== Tarea 3: Editar y Eliminar =====================
+const movimientoEditando = ref(null)
+const editCantidad = ref(null)
+const editDescripcion = ref('')
+const editDia = ref(1)
+const editMes = ref('Octubre')
+const guardandoEdicion = ref(false)
+const errorEdicion = ref('')
+
+// Regla de estado: un movimiento pagado no permite modificar su monto
+const montoBloqueado = computed(() => movimientoEditando.value?.estado === 'pagado')
+
+function abrirEdicion(item) {
+  movimientoEditando.value = item
+  editCantidad.value = Number(item.monto)
+  editDescripcion.value = item.descripcion
+  const [, mes, dia] = String(item.fecha).split('-')
+  editDia.value = parseInt(dia, 10) || 1
+  editMes.value = mesesDisponibles[parseInt(mes, 10) - 1] || 'Octubre'
+  errorEdicion.value = ''
+}
+
+function cerrarEdicion() {
+  movimientoEditando.value = null
+  errorEdicion.value = ''
+}
+
+async function guardarEdicion() {
+  const item = movimientoEditando.value
+  if (!item) return
+  if (!editDescripcion.value.trim()) {
+    errorEdicion.value = 'La descripción no puede estar vacía.'
+    return
+  }
+  if (!montoBloqueado.value && !(Number(editCantidad.value) > 0)) {
+    errorEdicion.value = 'La cantidad debe ser mayor a 0.'
+    return
+  }
+
+  const anio = String(item.fecha).split('-')[0] || '2026'
+  const mesStr = String(mesesDisponibles.indexOf(editMes.value) + 1).padStart(2, '0')
+  const diaStr = String(parseInt(editDia.value || 1, 10)).padStart(2, '0')
+  const cambios = {
+    descripcion: editDescripcion.value.trim(),
+    fecha: `${anio}-${mesStr}-${diaStr}`
+  }
+  if (!montoBloqueado.value) cambios.monto = Number(editCantidad.value)
+
+  guardandoEdicion.value = true
+  errorEdicion.value = ''
+  try {
+    const res = await fetch(`${API_URL}/movimientos/${item.id}`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify(cambios)
+    })
+    if (res.status === 401) return sesionExpirada()
+    const data = await res.json().catch(() => ({}))
+    if (res.status === 404) {
+      // Se eliminó en otra pestaña o dispositivo mientras se editaba
+      cerrarEdicion()
+      await sincronizarDesdeServidor(`"${item.descripcion}" ya no existe: se eliminó en otra pestaña o dispositivo. Tus cambios no se guardaron.`)
+      return
+    }
+    if (!res.ok) {
+      // El backend explica el motivo (p. ej. 409: se pagó en otra pestaña y el monto quedó bloqueado)
+      errorEdicion.value = data.detail || 'No se pudieron guardar los cambios.'
+      if (res.status === 409) await sincronizarDesdeServidor()
+      return
+    }
+    avisarOtrasPestanas('editado', data.descripcion)
+    cerrarEdicion()
+    // Recarga desde la BD: trae también lo que cambió en otras pestañas
+    await sincronizarDesdeServidor(`Se editó "${data.descripcion}".`)
+  } catch (e) {
+    errorEdicion.value = 'No se pudo conectar con el servidor. Los cambios no se guardaron.'
+  } finally {
+    guardandoEdicion.value = false
+  }
+}
+
+const movimientoAEliminar = ref(null)
+const eliminando = ref(false)
+const errorEliminar = ref('')
+
+function pedirConfirmacionEliminar(item) {
+  movimientoAEliminar.value = item
+  errorEliminar.value = ''
+}
+
+function cancelarEliminar() {
+  movimientoAEliminar.value = null
+  errorEliminar.value = ''
+}
+
+async function confirmarEliminar() {
+  const item = movimientoAEliminar.value
+  if (!item) return
+  eliminando.value = true
+  errorEliminar.value = ''
+  try {
+    const res = await fetch(`${API_URL}/movimientos/${item.id}`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    if (res.status === 401) return sesionExpirada()
+    // 404: ya no existe en la base de datos, se retira igual de la lista
+    if (!res.ok && res.status !== 404) {
+      const data = await res.json().catch(() => ({}))
+      errorEliminar.value = data.detail || 'No se pudo eliminar el movimiento.'
+      return
+    }
+    cancelarEliminar()
+    if (res.status === 404) {
+      await sincronizarDesdeServidor(`"${item.descripcion}" ya se había eliminado en otra pestaña o dispositivo.`)
+    } else {
+      avisarOtrasPestanas('eliminado', item.descripcion)
+      await sincronizarDesdeServidor(`Se eliminó "${item.descripcion}".`)
+    }
+  } catch (e) {
+    errorEliminar.value = 'No se pudo conectar con el servidor. El movimiento no se eliminó.'
+  } finally {
+    eliminando.value = false
+  }
+}
+
+// ============ Sincronización entre pestañas (misma cuenta) ============
+// Cada pestaña avisa a las demás cuando cambia un movimiento; las demás
+// recargan la lista desde la base de datos y explican qué cambió.
+const canalPestanas = !esDemo && typeof BroadcastChannel !== 'undefined'
+  ? new BroadcastChannel(`movimientos_${usuarioActual.email || 'estudiante'}`)
+  : null
+
+const TEXTO_ACCION = {
+  creado: 'se registró',
+  editado: 'se editó',
+  eliminado: 'se eliminó'
+}
+
+function avisarOtrasPestanas(accion, descripcion) {
+  canalPestanas?.postMessage({ accion, descripcion })
+}
+
+async function sincronizarDesdeServidor(mensaje) {
+  // Se guarda el estado que esta pestaña conocía para detectar pagos hechos en otra
+  const estadosAntes = new Map(listaMovimientos.value.map(m => [m.id, m.estado]))
+  await cargarMovimientos()
+  const pagosExternos = listaMovimientos.value
+    .filter(m => estadosAntes.get(m.id) === 'pendiente' && m.estado === 'pagado')
+    .map(m => `Se actualizó "${m.descripcion}" a pagado.`)
+    .join(' ')
+  let extra = ''
+
+  // Los modales abiertos no deben quedarse con datos viejos
+  if (movimientoEditando.value) {
+    const actual = listaMovimientos.value.find(m => m.id === movimientoEditando.value.id)
+    if (!actual) {
+      cerrarEdicion()
+      extra = ' Se cerró la edición porque ese gasto ya no existe.'
+    } else {
+      if (actual.estado === 'pagado' && movimientoEditando.value.estado !== 'pagado') {
+        editCantidad.value = Number(actual.monto)
+        extra = ' Ese gasto ahora está pagado, por eso su monto quedó bloqueado.'
+      }
+      movimientoEditando.value = actual
+    }
+  }
+  if (movimientoAEliminar.value) {
+    const actual = listaMovimientos.value.find(m => m.id === movimientoAEliminar.value.id)
+    if (!actual) {
+      cancelarEliminar()
+      extra = ' Se cerró la confirmación porque ese gasto ya no existe.'
+    } else {
+      movimientoAEliminar.value = actual
+    }
+  }
+
+  const texto = [pagosExternos, mensaje].filter(Boolean).join(' ') + extra
+  if (texto.trim()) mostrarAvisoEstado(texto.trim())
+}
+
+// Avisos recibidos mientras esta pestaña estaba oculta: se muestran al entrar a ella
+const avisosPendientes = []
+
+function mostrarAvisosPendientes() {
+  if (document.visibilityState !== 'visible' || avisosPendientes.length === 0) return
+  const mensaje = avisosPendientes.splice(0).join(' ')
+  sincronizarDesdeServidor(`${mensaje} La lista se actualizó.`)
+}
+
+if (canalPestanas) {
+  canalPestanas.onmessage = ({ data }) => {
+    const accion = TEXTO_ACCION[data?.accion] || 'se modificó'
+    avisosPendientes.push(`En otra pestaña ${accion} "${data?.descripcion}".`)
+    mostrarAvisosPendientes()
+  }
+}
+
 onMounted(() => {
   cargarMovimientos()
   cargarCategorias()
+  document.addEventListener('visibilitychange', mostrarAvisosPendientes)
+})
+
+onUnmounted(() => {
+  document.removeEventListener('visibilitychange', mostrarAvisosPendientes)
+  canalPestanas?.close()
 })
 </script>
 
@@ -1127,6 +1474,93 @@ onMounted(() => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
+}
+
+/* --- Tarea 3: acciones Editar / Eliminar --- */
+.acciones-fila {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.btn-accion {
+  background: #FFFFFF;
+  border: 1.5px solid;
+  padding: 6px 14px;
+  border-radius: 9999px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-editar {
+  color: #1E3350;
+  border-color: #CBD5E1;
+}
+
+.btn-editar:hover {
+  background-color: #F1F5F9;
+}
+
+.btn-eliminar {
+  color: #DC2626;
+  border-color: #FCA5A5;
+}
+
+.btn-eliminar:hover {
+  background-color: #FEF2F2;
+}
+
+.icon-editar {
+  background-color: #DBEAFE;
+  color: #2563EB;
+}
+
+.input-cantidad:disabled {
+  background-color: #F1F5F9;
+  color: #64748B;
+  cursor: not-allowed;
+}
+
+.aviso-bloqueo {
+  font-size: 13px;
+  color: #92400E;
+  background-color: #FEF3C7;
+  border-left: 3px solid #F59E0B;
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin: 2px 0 0 0;
+}
+
+.texto-confirmar {
+  font-size: 14px;
+  color: #334155;
+  line-height: 1.5;
+  margin: 12px 0 20px 0;
+}
+
+.btn-confirmar-eliminar {
+  background-color: #DC2626;
+  color: #FFFFFF;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.btn-confirmar-eliminar:hover:not(:disabled) {
+  background-color: #B91C1C;
+}
+
+.btn-confirmar-eliminar:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .col-desc-dato {

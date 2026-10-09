@@ -325,7 +325,9 @@
       </div>
     </div>
 
+
     <!-- Modal: Editar Movimiento (Tarea 3) -->
+
     <div v-if="movimientoEditando" class="modal-overlay" @click.self="cerrarEdicion">
       <div class="modal-card dashboard-modal-card">
         <div class="dashboard-modal-header">
@@ -911,6 +913,9 @@ async function confirmarEliminar() {
   }
 }
 
+
+
+
 // ============ Sincronización entre pestañas (misma cuenta) ============
 // Cada pestaña avisa a las demás cuando cambia un movimiento; las demás
 // recargan la lista desde la base de datos y explican qué cambió.
@@ -994,6 +999,11 @@ onUnmounted(() => {
   canalPestanas?.close()
 })
 </script>
+
+
+
+
+
 
 <style scoped>
 .movimientos-page {

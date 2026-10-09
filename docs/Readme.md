@@ -112,17 +112,37 @@ Para más detalles, consulta [task-02-state-tests.md](task-02-state-tests.md).
 
 ---
 
-## 7. Estructura del proyecto
+## TAREA-3
+
+## 7. Editar, eliminar y restricción por estado
+
+- **Editar** un movimiento (cantidad, descripción, fecha) con el botón **"Editar"**.
+- **Eliminar** un movimiento con el botón **"Eliminar"**, que pide confirmación.
+- **Restricción:** un movimiento **pagado no permite modificar su monto**; el campo aparece bloqueado y la interfaz explica el motivo.
+
+Para ejecutar todas las pruebas (Tarea 2 y Tarea 3):
+
+```bash
+cd "PRESUPUESTO ESTUDIANTIL/BACKEND"
+python -m pytest -v tests -p no:warnings
+```
+
+Para más detalles, consulta [task-03-edit-delete.md](task-03-edit-delete.md).
+
+---
+
+## 8. Estructura del proyecto
 
 ```
 PROYECTO2-IHC/
 ├── docs/
 │   ├── README.md                 ← este archivo (instalación, ejecución y pruebas)
 │   ├── task-01-access.md         ← Documentación Tarea 1 (Manejo de acceso)
-│   └── task-02-state-tests.md    ← Documentación Tarea 2 (Máquina de estados y pruebas)
+│   ├── task-02-state-tests.md    ← Documentación Tarea 2 (Máquina de estados y pruebas)
+│   └── task-03-edit-delete.md    ← Documentación Tarea 3 (Editar, eliminar y restricción)
 └── PRESUPUESTO ESTUDIANTIL/
     ├── BASE DE DATOS/            ← schema.sql (tablas) y seed.sql (datos de ejemplo)
     ├── BACKEND/                  ← API FastAPI, modelos, routers y tests/
-    │   └── tests/                ← test_estado_movimiento.py (4 pruebas unitarias)
+    │   └── tests/                ← conftest.py, test_estado_movimiento.py (Tarea 2) y test_editar_eliminar_movimiento.py (Tarea 3)
     └── FRONTEND/                 ← App Vue 3 (vistas, componentes y estilos)
 ```

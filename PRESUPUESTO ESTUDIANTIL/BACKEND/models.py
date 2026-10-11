@@ -15,6 +15,7 @@ class Usuario(Base):
     token_recuperacion = Column(String(255), nullable=True)
     codigo_expira = Column(DateTime, nullable=True)
     codigo_intentos = Column(Integer, default=0)
+    limite_mensual = Column(Numeric(10, 2), nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
     movimientos = relationship("Movimiento", back_populates="usuario", cascade="all, delete-orphan")

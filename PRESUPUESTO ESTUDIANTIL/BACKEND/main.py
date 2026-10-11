@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
 import models
-from routers import usuarios, movimientos, categorias
+from routers import usuarios, movimientos, categorias, limite
 
 from sqlalchemy import text, inspect
 
@@ -16,6 +16,13 @@ try:
                 conn.execute(text("ALTER TABLE movimientos ADD COLUMN estado VARCHAR(20) DEFAULT 'pendiente' NOT NULL;"))
                 conn.commit()
                 print("[OK] Columna 'estado' agregada a tabla movimientos exitosamente.")
+    if "usuarios" in inspector.get_table_names():
+        columnas = [c["name"] for c in inspector.get_columns("usuarios")]
+        if "limite_mensual" not in columnas:
+            with engine.connect() as conn:
+                conn.execute(text("ALTER TABLE usuarios ADD COLUMN limite_mensual NUMERIC(10, 2) DEFAULT NULL;"))
+                conn.commit()
+                print("[OK] Columna 'limite_mensual' agregada a tabla usuarios exitosamente.")
 except Exception as e:
     print(f"Nota de conexion a la base de datos: {e}")
 
@@ -40,6 +47,7 @@ app.add_middleware(
 app.include_router(usuarios.router)
 app.include_router(movimientos.router)
 app.include_router(categorias.router)
+app.include_router(limite.router)
 
 @app.get("/")
 def ruta_raiz():

@@ -5,6 +5,8 @@ from database import get_db
 import models
 import schemas
 from security import get_current_user
+from reglas_presupuesto import validar_gasto_con_limite
+from routers.limite import gastos_del_mes, limite_del_usuario
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos Estudiantiles"])
 
@@ -28,6 +30,14 @@ def validar_edicion(mov: models.Movimiento, datos: schemas.MovimientoUpdate):
             status_code=status.HTTP_409_CONFLICT,
             detail=MENSAJE_MONTO_BLOQUEADO
         )
+
+def verificar_limite_mensual(db: Session, usuario: models.Usuario, monto: float, fecha, excluir_id: int = None):
+    """Regla del límite mensual: un gasto no puede hacer que el total del mes supere el límite."""
+    gastado = gastos_del_mes(db, usuario.id, fecha, excluir_id)
+    motivo = validar_gasto_con_limite(float(monto), gastado, limite_del_usuario(usuario))
+    if motivo:
+        db.rollback()  # una edición rechazada no debe dejar cambios pendientes
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=motivo)
 
 def obtener_movimiento_propio(movimiento_id: int, db: Session, usuario: models.Usuario) -> models.Movimiento:
     mov = db.query(models.Movimiento).filter(
@@ -122,6 +132,9 @@ def crear_movimiento(
         except Exception:
             pass
 
+    if (datos.tipo or "gasto") == "gasto":
+        verificar_limite_mensual(db, usuario, datos.monto, fecha_val)
+
     nuevo = models.Movimiento(
         usuario_id=usuario.id,
         categoria_id=cat_id,
@@ -215,6 +228,9 @@ def editar_movimiento(
             mov.fecha = datetime.strptime(datos.fecha, "%Y-%m-%d").date()
         except ValueError:
             raise HTTPException(status_code=400, detail="Fecha inválida. Usa el formato AAAA-MM-DD.")
+
+    if mov.tipo == "gasto":
+        verificar_limite_mensual(db, usuario, mov.monto, mov.fecha, excluir_id=mov.id)
 
     db.commit()
     db.refresh(mov)

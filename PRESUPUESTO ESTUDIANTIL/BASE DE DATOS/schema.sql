@@ -12,6 +12,7 @@ CREATE TABLE usuarios (
     token_recuperacion VARCHAR(255) DEFAULT NULL,    
     codigo_expira TIMESTAMP DEFAULT NULL,           
     codigo_intentos INTEGER DEFAULT 0,             
+    limite_mensual NUMERIC(10, 2) DEFAULT NULL CHECK (limite_mensual > 0),
     creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

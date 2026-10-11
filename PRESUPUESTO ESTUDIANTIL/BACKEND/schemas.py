@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Any
 
 class UsuarioRegistro(BaseModel):
     nombre: str
@@ -74,3 +74,13 @@ class CategoriaOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+class LimiteMensualIn(BaseModel):
+    # Se recibe tal cual lo escribió el estudiante; la regla decide si es válido
+    limite: Any = None
+
+class LimiteMensualOut(BaseModel):
+    limite: Optional[float] = None
+    gastado_mes: float
+    disponible: Optional[float] = None
+    mes: str

@@ -42,6 +42,50 @@
 
       </div>
 
+      <!-- Límite mensual de gastos (Issue #1) -->
+      <section v-if="!esDemo" class="limite-card" aria-labelledby="titulo-limite">
+        <div class="limite-cabecera">
+          <div>
+            <h2 id="titulo-limite" class="limite-titulo">Límite mensual de gastos</h2>
+            <span class="card-subtext">{{ limiteInfo.mes }} · cuenta gastos pagados y pendientes del mes</span>
+          </div>
+          <button type="button" class="btn-limite" @click="abrirModalLimite">
+            {{ limiteInfo.limite === null ? 'Definir límite' : 'Cambiar límite' }}
+          </button>
+        </div>
+
+        <p v-if="limiteInfo.limite === null" class="limite-sin-definir">
+          Aún no definiste un límite. Llevas gastado <strong>{{ limiteInfo.gastado_mes.toFixed(2) }} Bs</strong> este mes.
+        </p>
+        <template v-else>
+          <div class="limite-cifras">
+            <div>
+              <span class="limite-etiqueta">Llevo gastado</span>
+              <span class="limite-valor amount-danger">{{ limiteInfo.gastado_mes.toFixed(2) }} Bs</span>
+            </div>
+            <div>
+              <span class="limite-etiqueta">Me queda</span>
+              <span :class="['limite-valor', limiteInfo.disponible > 0 ? 'amount-ok' : 'amount-danger']">{{ limiteInfo.disponible.toFixed(2) }} Bs</span>
+            </div>
+            <div>
+              <span class="limite-etiqueta">Mi límite</span>
+              <span class="limite-valor amount-navy">{{ limiteInfo.limite.toFixed(2) }} Bs</span>
+            </div>
+          </div>
+          <div
+            class="limite-barra"
+            role="progressbar"
+            :aria-valuenow="porcentajeLimite"
+            aria-valuemin="0"
+            aria-valuemax="100"
+            :aria-label="`Usaste el ${porcentajeLimite}% de tu límite`"
+          >
+            <div :class="['limite-barra-relleno', porcentajeLimite >= 90 ? 'barra-alerta' : (porcentajeLimite >= 70 ? 'barra-aviso' : '')]" :style="{ width: porcentajeLimite + '%' }"></div>
+          </div>
+          <span class="card-subtext">Usaste el {{ porcentajeLimite }}% de tu límite.</span>
+        </template>
+      </section>
+
       <div class="actions-bar">
         <button
           @click="abrirModal = true"
@@ -326,6 +370,51 @@
     </div>
 
 
+    <!-- Modal: Definir límite mensual (Issue #1) -->
+    <div v-if="modalLimite" class="modal-overlay" @click.self="cerrarModalLimite">
+      <div class="modal-card dashboard-modal-card">
+        <div class="dashboard-modal-header">
+          <div class="dashboard-header-left">
+            <h2 class="dashboard-titulo">Límite mensual</h2>
+          </div>
+          <button @click="cerrarModalLimite" class="btn-close-modal" title="Cerrar">✕</button>
+        </div>
+
+        <p class="dashboard-subtitulo">
+          ¿Cuánto quieres gastar como máximo en el mes? Ya llevas
+          <strong>{{ limiteInfo.gastado_mes.toFixed(2) }} Bs</strong>, así que el límite no puede ser menor.
+        </p>
+
+        <form @submit.prevent="guardarLimite" class="dashboard-form" novalidate>
+          <div class="form-grupo-custom">
+            <label class="form-label-custom" for="input-limite">Límite:</label>
+            <div class="input-moneda-wrapper">
+              <span class="prefijo-bs">Bs</span>
+              <input
+                id="input-limite"
+                v-model="limiteEscrito"
+                type="text"
+                inputmode="decimal"
+                placeholder="500"
+                class="form-input-custom input-cantidad"
+                :aria-describedby="errorLimite ? 'error-limite' : undefined"
+                :aria-invalid="!!errorLimite"
+              />
+            </div>
+          </div>
+
+          <p v-if="errorLimite" id="error-limite" class="form-error-custom" role="alert">{{ errorLimite }}</p>
+
+          <div class="dashboard-modal-actions">
+            <button type="button" @click="cerrarModalLimite" class="btn-cancelar-modal">Cancelar</button>
+            <button type="submit" class="btn-guardar-principal" :disabled="guardandoLimite">
+              {{ guardandoLimite ? 'Guardando...' : 'Guardar límite' }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <!-- Modal: Editar Movimiento (Tarea 3) -->
 
     <div v-if="movimientoEditando" class="modal-overlay" @click.self="cerrarEdicion">
@@ -461,6 +550,7 @@ import { useRouter } from 'vue-router'
 import iconSaldo from '../assets/icon-saldo.png'
 import iconIngresos from '../assets/icon-ingresos.png'
 import iconGastos from '../assets/icon-gastos.png'
+import { validarLimiteMensual, convertirLimite, validarGastoConLimite } from '../utils/reglasPresupuesto'
 
 // =========================================================================
 // SALDO BASE CONFIGURABLE:
@@ -575,11 +665,87 @@ async function cargarMovimientos() {
         // eliminaciones se mantienen tal cual después de recargar
         listaMovimientos.value = data.movimientos || []
         guardarEnStorage(listaMovimientos.value)
+        await cargarLimite()
       }
     }
   } catch (e) {
     console.warn('Servidor offline: usando movimientos almacenados localmente.')
   }
+}
+
+// ===================== Límite mensual de gastos (Issue #1) =====================
+// El límite vive en la base de datos (usuarios.limite_mensual), por eso se
+// mantiene al recargar. El backend solo devuelve el límite del usuario del token.
+const limiteInfo = ref({ limite: null, gastado_mes: 0, disponible: null, mes: '' })
+const modalLimite = ref(false)
+const limiteEscrito = ref('')
+const errorLimite = ref('')
+const guardandoLimite = ref(false)
+
+const porcentajeLimite = computed(() => {
+  const { limite, gastado_mes } = limiteInfo.value
+  if (!limite) return 0
+  return Math.min(Math.round((gastado_mes / limite) * 100), 100)
+})
+
+async function cargarLimite() {
+  if (esDemo) return
+  try {
+    const res = await fetch(`${API_URL}/limite`, { headers: authHeaders() })
+    if (res.ok) limiteInfo.value = await res.json()
+  } catch (e) {
+    console.warn('No se pudo cargar el límite mensual.')
+  }
+}
+
+function abrirModalLimite() {
+  limiteEscrito.value = limiteInfo.value.limite !== null ? String(limiteInfo.value.limite) : ''
+  errorLimite.value = ''
+  modalLimite.value = true
+}
+
+function cerrarModalLimite() {
+  modalLimite.value = false
+  errorLimite.value = ''
+}
+
+async function guardarLimite() {
+  // Aviso inmediato con la misma regla del backend
+  const motivo = validarLimiteMensual(limiteEscrito.value, limiteInfo.value.gastado_mes)
+  if (motivo) {
+    errorLimite.value = motivo
+    return
+  }
+  guardandoLimite.value = true
+  errorLimite.value = ''
+  try {
+    const res = await fetch(`${API_URL}/limite`, {
+      method: 'PUT',
+      headers: authHeaders(),
+      body: JSON.stringify({ limite: convertirLimite(limiteEscrito.value) })
+    })
+    if (res.status === 401) return sesionExpirada()
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      errorLimite.value = data.detail || 'No se pudo guardar el límite.'
+      return
+    }
+    limiteInfo.value = data
+    cerrarModalLimite()
+    mostrarAvisoEstado(`Tu límite mensual ahora es ${data.limite.toFixed(2)} Bs.`)
+  } catch (e) {
+    errorLimite.value = 'No se pudo conectar con el servidor. El límite no se guardó.'
+  } finally {
+    guardandoLimite.value = false
+  }
+}
+
+// Gastos (pagados y pendientes) ya registrados en el mes de una fecha AAAA-MM-DD
+function gastosDelMesDe(fechaISO, excluirId = null) {
+  const mes = String(fechaISO).slice(0, 7)
+  return listaMovimientos.value
+    .filter(m => m.tipo === 'gasto' && m.id !== excluirId && String(m.fecha).startsWith(mes))
+    .reduce((sum, m) => sum + Number(m.monto || 0), 0)
 }
 
 async function cargarCategorias() {
@@ -698,6 +864,16 @@ async function guardarGastoEstudiantil() {
   const anio = 2026
   const fechaISO = `${anio}-${mesStr}-${diaStr}`
 
+  // Regla del límite: avisar antes de enviar si el gasto superaría el límite del mes
+  const motivoLimite = validarGastoConLimite(
+    Number(cantidadGasto.value), gastosDelMesDe(fechaISO), limiteInfo.value.limite
+  )
+  if (motivoLimite) {
+    errorMsgGasto.value = motivoLimite
+    guardandoGasto.value = false
+    return
+  }
+
   const nuevoGasto = {
     id: Date.now(),
     descripcion: descripcionGasto.value.trim(),
@@ -734,17 +910,30 @@ async function guardarGastoEstudiantil() {
       guardarEnStorage(listaMovimientos.value)
       avisarOtrasPestanas('creado', nuevoGasto.descripcion)
       await sincronizarDesdeServidor(`Se registró "${nuevoGasto.descripcion}".`)
+    } else {
+      // El backend rechazó el gasto (p. ej. 409: supera el límite mensual):
+      // se quita de la lista y el modal queda abierto explicando el motivo
+      const data = await res.json().catch(() => ({}))
+      listaMovimientos.value = listaMovimientos.value.filter(m => m !== nuevoGasto)
+      guardarEnStorage(listaMovimientos.value)
+      errorMsgGasto.value = data.detail || 'No se pudo registrar el gasto.'
+      await cargarLimite()
+      return
     }
   } catch (err) {
     console.warn('Gasto guardado en almacenamiento local (servidor desconectado).')
   } finally {
     guardandoGasto.value = false
-    cantidadGasto.value = null
-    descripcionGasto.value = ''
-    diaGasto.value = 1
-    mesGasto.value = 'Octubre'
-    abrirModal.value = false
   }
+  limpiarFormularioGasto()
+}
+
+function limpiarFormularioGasto() {
+  cantidadGasto.value = null
+  descripcionGasto.value = ''
+  diaGasto.value = 1
+  mesGasto.value = 'Octubre'
+  abrirModal.value = false
 }
 
 const actualizandoEstado = ref(null)
@@ -1079,6 +1268,101 @@ onUnmounted(() => {
 .card-subtext {
   font-size: clamp(12px, 0.8vw, 14px);
   color: #475569;
+}
+
+/* Límite mensual de gastos (Issue #1) */
+.limite-card {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: clamp(18px, 1.4vw, 26px) clamp(20px, 1.6vw, 30px);
+  box-shadow: 0 4px 14px rgba(15, 35, 65, 0.08);
+  margin-bottom: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.limite-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.limite-titulo {
+  font-size: clamp(17px, 1.2vw, 21px);
+  font-weight: 700;
+  color: #1E3350;
+}
+
+.btn-limite {
+  background: #FFFFFF;
+  color: #3B78B0;
+  border: 1.5px solid #3B78B0;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: clamp(14px, 0.95vw, 16px);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-limite:hover {
+  background: #EAF2FA;
+}
+
+.limite-sin-definir {
+  font-size: clamp(14px, 0.95vw, 16px);
+  color: #334155;
+}
+
+.limite-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.limite-etiqueta {
+  display: block;
+  font-size: clamp(13px, 0.85vw, 15px);
+  color: #475569;
+}
+
+.limite-valor {
+  font-size: clamp(20px, 1.5vw, 28px);
+  font-weight: 700;
+}
+
+.amount-ok {
+  color: #15803D;
+}
+
+.limite-barra {
+  height: 12px;
+  background: #E2E8F0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.limite-barra-relleno {
+  height: 100%;
+  background: #3B78B0;
+  border-radius: 999px;
+  transition: width 0.3s;
+}
+
+.limite-barra-relleno.barra-aviso {
+  background: #D97706;
+}
+
+.limite-barra-relleno.barra-alerta {
+  background: #A63A3A;
+}
+
+@media (max-width: 600px) {
+  .limite-cifras {
+    grid-template-columns: 1fr;
+  }
 }
 
 .actions-bar {

@@ -17,8 +17,10 @@
           <img :src="iconSaldo" alt="" class="card-icon" />
           <div class="card-info">
             <span class="card-label">Saldo Disponible</span>
-            <span class="card-amount amount-navy">{{ esDemo ? `$${saldoTotal.toFixed(2)}` : `${saldoTotal.toFixed(2)} Bs` }}</span>
-            <span class="card-subtext">Actualizado hoy</span>
+            <span :class="['card-amount', !esDemo && saldoTotal < 0 ? 'amount-danger' : 'amount-navy']">{{ esDemo ? `$${saldoTotal.toFixed(2)}` : `${saldoTotal.toFixed(2)} Bs` }}</span>
+            <span v-if="esDemo" class="card-subtext">Actualizado hoy</span>
+            <span v-else-if="saldoTotal < 0" class="card-subtext texto-alerta">Registraste más gastos pagados que ingresos recibidos</span>
+            <span v-else class="card-subtext">Ingresos recibidos − gastos pagados</span>
           </div>
         </div>
 
@@ -27,7 +29,7 @@
           <div class="card-info">
             <span class="card-label">Ingresos del Mes</span>
             <span class="card-amount amount-sky">{{ esDemo ? `$${ingresosTotal.toFixed(2)}` : `${ingresosTotal.toFixed(2)} Bs` }}</span>
-            <span class="card-subtext">Octubre 2026</span>
+            <span class="card-subtext">{{ esDemo ? 'Octubre 2026' : mesActualTexto }}</span>
           </div>
         </div>
 
@@ -36,7 +38,7 @@
           <div class="card-info">
             <span class="card-label">Gastos del Mes</span>
             <span class="card-amount amount-danger">{{ esDemo ? `$${gastosTotal.toFixed(2)}` : `${gastosTotal.toFixed(2)} Bs` }}</span>
-            <span class="card-subtext">Octubre 2026</span>
+            <span class="card-subtext">{{ esDemo ? 'Octubre 2026' : `${mesActualTexto} · pagados y pendientes` }}</span>
           </div>
         </div>
 
@@ -86,7 +88,29 @@
         </template>
       </section>
 
-      <div class="actions-bar">
+      <!-- Barra de acciones: buscador + botón de filtros + registrar (Issue #2) -->
+      <div :class="['actions-bar', { 'actions-bar-filtros': !esDemo }]">
+        <template v-if="!esDemo">
+          <div class="buscador">
+            <svg class="buscador-icono" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="7"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+            <label for="filtro-q" class="solo-lector">Buscar movimientos</label>
+            <input id="filtro-q" v-model="filtros.q" type="search" class="filtro-input buscador-input" placeholder="Buscar por descripción o categoría" />
+          </div>
+          <button
+            type="button"
+            :class="['btn-filtros', { 'btn-filtros-activo': mostrarFiltros || cantidadFiltrosPanel }]"
+            :aria-expanded="mostrarFiltros"
+            aria-controls="panel-filtros"
+            @click="mostrarFiltros = !mostrarFiltros"
+          >
+            Filtros
+            <span v-if="cantidadFiltrosPanel" class="contador-filtros" :aria-label="`${cantidadFiltrosPanel} activos`">{{ cantidadFiltrosPanel }}</span>
+            <span aria-hidden="true">{{ mostrarFiltros ? '▴' : '▾' }}</span>
+          </button>
+        </template>
         <button
           @click="abrirModal = true"
           class="btn-new-mov"
@@ -98,6 +122,86 @@
       </div>
 
       <div v-if="avisoEstado" class="aviso-estado" role="alert">{{ avisoEstado }}</div>
+
+      <!-- Filtros (Issue #2): los selectores solo se ven al pulsar "Filtros"; los chips y el total, solo si hay filtros -->
+      <section
+        v-if="!esDemo && (mostrarFiltros || hayFiltrosActivos || errorFiltro)"
+        class="filtros-card"
+        aria-label="Filtros de movimientos"
+      >
+        <div v-if="mostrarFiltros" id="panel-filtros" class="filtros-grid">
+          <div class="filtro-campo">
+            <label for="filtro-tipo" class="filtro-label">Tipo</label>
+            <select id="filtro-tipo" v-model="filtros.tipo" class="filtro-input">
+              <option value="">Todos</option>
+              <option value="gasto">Gastos</option>
+              <option value="ingreso">Ingresos</option>
+            </select>
+          </div>
+          <div class="filtro-campo">
+            <label for="filtro-categoria" class="filtro-label">Categoría</label>
+            <select id="filtro-categoria" v-model="filtros.categoria" class="filtro-input">
+              <option value="">Todas</option>
+              <option v-for="cat in categoriasDelFiltro" :key="cat.id" :value="cat.nombre">{{ cat.nombre }}</option>
+              <option value="General">General (sin categoría)</option>
+            </select>
+          </div>
+          <div class="filtro-campo">
+            <label for="filtro-estado" class="filtro-label">Estado</label>
+            <select id="filtro-estado" v-model="filtros.estado" class="filtro-input">
+              <option value="">Todos</option>
+              <option value="pendiente">Pendiente</option>
+              <option value="pagado">Pagado</option>
+            </select>
+          </div>
+          <div class="filtro-campo">
+            <label for="filtro-periodo" class="filtro-label">Periodo</label>
+            <select id="filtro-periodo" v-model="filtros.periodo" class="filtro-input">
+              <option value="todos">Todo el tiempo</option>
+              <option value="este_mes">Este mes</option>
+              <option value="mes_anterior">Mes anterior</option>
+              <option value="rango">Rango de fechas</option>
+            </select>
+          </div>
+          <template v-if="filtros.periodo === 'rango'">
+            <div class="filtro-campo">
+              <label for="filtro-desde" class="filtro-label">Desde</label>
+              <input id="filtro-desde" v-model="filtros.desde" type="date" class="filtro-input" />
+            </div>
+            <div class="filtro-campo">
+              <label for="filtro-hasta" class="filtro-label">Hasta</label>
+              <input id="filtro-hasta" v-model="filtros.hasta" type="date" class="filtro-input" />
+            </div>
+          </template>
+        </div>
+
+        <p v-if="mostrarFiltros && avisoRangoIncompleto" class="filtro-aviso">Elige la fecha "desde" y la fecha "hasta" para aplicar el rango.</p>
+        <p v-if="errorFiltro" class="form-error-custom" role="alert">{{ errorFiltro }}</p>
+
+        <div v-if="hayFiltrosActivos" class="filtros-activos">
+          <span class="filtro-label">Filtros aplicados:</span>
+          <button
+            v-for="chip in chipsFiltros"
+            :key="chip.clave"
+            type="button"
+            class="chip-filtro"
+            :aria-label="`Quitar filtro ${chip.texto}`"
+            @click="quitarFiltro(chip.clave)"
+          >
+            {{ chip.texto }} <span aria-hidden="true">✕</span>
+          </button>
+          <button type="button" class="btn-quitar-filtros" @click="quitarTodosLosFiltros">Quitar todos</button>
+        </div>
+
+        <p v-if="hayFiltrosActivos" class="filtro-total" aria-live="polite">
+          <template v-if="cargandoFiltro">Buscando...</template>
+          <template v-else>
+            {{ totalesVisibles.cantidad }} {{ totalesVisibles.cantidad === 1 ? 'movimiento' : 'movimientos' }}
+            · Gastos: <strong class="amount-danger">{{ totalesVisibles.total_gastos.toFixed(2) }} Bs</strong>
+            · Ingresos: <strong class="amount-ok">{{ totalesVisibles.total_ingresos.toFixed(2) }} Bs</strong>
+          </template>
+        </p>
+      </section>
 
       <!-- Tarjeta Principal de Movimientos para cuentas de usuario (Docente / IHC) -->
       <div v-if="!esDemo" class="tarjeta-estudiantil-card">
@@ -112,7 +216,18 @@
             </tr>
           </thead>
           <tbody>
-            <tr v-if="listaMovimientos.length === 0" class="fila-vacia">
+            <tr v-if="hayFiltrosActivos && listaVisible.length === 0 && !cargandoFiltro" class="fila-vacia">
+              <td colspan="5" class="celda-vacia">
+                <div class="estado-vacio">
+                  <span class="emoji-vacio">🔍</span>
+                  <p class="titulo-vacio">Ningún movimiento coincide con tu búsqueda</p>
+                  <p class="subtitulo-vacio">Filtros usados: {{ chipsFiltros.map(c => c.texto).join(' · ') }}. Prueba quitando alguno.</p>
+                  <button type="button" class="btn-quitar-filtros" @click="quitarTodosLosFiltros">Quitar todos los filtros</button>
+                </div>
+              </td>
+            </tr>
+
+            <tr v-else-if="!hayFiltrosActivos && listaMovimientos.length === 0" class="fila-vacia">
               <td colspan="5" class="celda-vacia">
                 <div class="estado-vacio">
                   <span class="emoji-vacio">💳</span>
@@ -122,7 +237,7 @@
               </td>
             </tr>
 
-            <tr v-for="item in listaMovimientos" :key="item.id" class="fila-movimiento">
+            <tr v-for="item in listaVisible" :key="item.id" class="fila-movimiento">
               <td class="col-mov-dato">
                 <span :class="['badge-movimiento', item.tipo === 'ingreso' ? 'badge-ingreso-bs' : (item.estado === 'pagado' ? 'badge-gasto-bs' : 'badge-pendiente-monto')]">
                   {{ formatearMovimientoTexto(item) }}
@@ -136,7 +251,7 @@
               </td>
               <td class="col-estado-dato text-center">
                 <span :class="['badge-estado-pill', item.estado === 'pagado' ? 'badge-estado-pagado' : 'badge-estado-pendiente']">
-                  {{ item.estado === 'pagado' ? 'Pagado' : 'Pendiente' }}
+                  {{ item.estado === 'pagado' ? (item.tipo === 'ingreso' ? 'Recibido' : 'Pagado') : 'Pendiente' }}
                 </span>
               </td>
               <td class="col-accion-dato text-center">
@@ -150,7 +265,7 @@
                   title="Marcar como pagado"
                 >
                   <span v-if="actualizandoEstado === item.id">Guardando...</span>
-                  <span v-else>Marcar como pagado</span>
+                  <span v-else>{{ item.tipo === 'ingreso' ? 'Marcar como recibido' : 'Marcar como pagado' }}</span>
                 </button>
                 <div v-else class="estado-pagado-check" title="Gasto pagado">
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round">
@@ -293,14 +408,25 @@
                 <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
               </svg>
             </div>
-            <h2 class="dashboard-titulo">Gasto</h2>
+            <h2 class="dashboard-titulo">{{ tipoGasto === 'ingreso' ? 'Ingreso' : 'Gasto' }}</h2>
           </div>
           <button @click="cerrarModalGasto" class="btn-close-modal" title="Cerrar">✕</button>
         </div>
 
-        <p class="dashboard-subtitulo">Registra los detalles del gasto universitario</p>
+        <p class="dashboard-subtitulo">
+          {{ tipoGasto === 'ingreso' ? 'Registra el dinero que recibiste' : 'Registra los detalles del gasto universitario' }}
+        </p>
 
         <form @submit.prevent="guardarGastoEstudiantil" class="dashboard-form">
+          <!-- Tipo de movimiento (Issue #2: permite registrar ingresos para poder filtrarlos) -->
+          <div class="form-grupo-custom">
+            <span class="form-label-custom">Tipo:</span>
+            <div class="type-selector" role="group" aria-label="Tipo de movimiento">
+              <button type="button" :class="['btn-type', tipoGasto === 'gasto' ? 'active-gasto' : '']" :aria-pressed="tipoGasto === 'gasto'" @click="tipoGasto = 'gasto'">Gasto</button>
+              <button type="button" :class="['btn-type', tipoGasto === 'ingreso' ? 'active-ingreso' : '']" :aria-pressed="tipoGasto === 'ingreso'" @click="tipoGasto = 'ingreso'">Ingreso</button>
+            </div>
+          </div>
+
           <!-- Campo Cantidad -->
           <div class="form-grupo-custom">
             <label class="form-label-custom">Cantidad:</label>
@@ -324,10 +450,18 @@
             <input
               v-model="descripcionGasto"
               type="text"
-              placeholder="Transporte"
+              :placeholder="tipoGasto === 'ingreso' ? 'Beca de octubre' : 'Almuerzo'"
               required
               class="form-input-custom"
             />
+          </div>
+
+          <!-- Campo Categoría -->
+          <div class="form-grupo-custom">
+            <label class="form-label-custom" for="categoria-gasto">Categoría:</label>
+            <select id="categoria-gasto" v-model="categoriaGasto" class="form-input-custom select-mes-custom" required>
+              <option v-for="cat in categoriasDelFormulario" :key="cat.id" :value="cat.nombre">{{ cat.nombre }}</option>
+            </select>
           </div>
 
           <!-- Fila Día y Mes -->
@@ -546,22 +680,15 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import iconSaldo from '../assets/icon-saldo.png'
 import iconIngresos from '../assets/icon-ingresos.png'
 import iconGastos from '../assets/icon-gastos.png'
 import { validarLimiteMensual, convertirLimite, validarGastoConLimite } from '../utils/reglasPresupuesto'
 
-// =========================================================================
-// SALDO BASE CONFIGURABLE:
-// Modifica aquí la cantidad (por defecto 700).
-// Si cambias este número en el código, se verá reflejado automáticamente
-// en el Saldo Disponible y se descontarán los gastos registrados.
-// =========================================================================
-const SALDO_BASE = 700
-
 const API_URL = 'http://localhost:8000'
 const router = useRouter()
+const route = useRoute()
 
 const usuarioActual = JSON.parse(localStorage.getItem('usuario') || '{}')
 const esDemo = usuarioActual.es_demo === true
@@ -614,26 +741,37 @@ const saldoDemo = ref(0)
 const ingresosDemo = ref(0)
 const gastosDemo = ref(0)
 
-// Gastos calculados automáticamente a partir de los movimientos (solo gastos pagados)
+function sumarMontos(lista) {
+  return lista.reduce((sum, item) => sum + Number(item.monto || 0), 0)
+}
+
+// Mes actual (AAAA-MM) y su nombre para las tarjetas "del Mes"
+const hoy = new Date()
+const mesActualISO = `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+// computed: mesesDisponibles se declara más abajo en el archivo
+const mesActualTexto = computed(() => `${mesesDisponibles[hoy.getMonth()]} ${hoy.getFullYear()}`)
+const esDelMesActual = m => String(m.fecha).startsWith(mesActualISO)
+
+// Gastos del Mes: gastos con fecha de este mes, pagados y pendientes.
+// Es el mismo número que "Llevo gastado" del límite (#1) y que el filtro "Gastos + Este mes" (#2).
 const gastosTotal = computed(() => {
   if (esDemo) return gastosDemo.value
-  return listaMovimientos.value
-    .filter(m => m.tipo === 'gasto' && m.estado === 'pagado')
-    .reduce((sum, item) => sum + Number(item.monto || 0), 0)
+  return sumarMontos(listaMovimientos.value.filter(m => m.tipo === 'gasto' && esDelMesActual(m)))
 })
 
-// Ingresos calculados automáticamente a partir de los movimientos
+// Ingresos del Mes: ingresos con fecha de este mes
 const ingresosTotal = computed(() => {
   if (esDemo) return ingresosDemo.value
-  return listaMovimientos.value
-    .filter(m => m.tipo === 'ingreso')
-    .reduce((sum, item) => sum + Number(item.monto || 0), 0)
+  return sumarMontos(listaMovimientos.value.filter(m => m.tipo === 'ingreso' && esDelMesActual(m)))
 })
 
-// Saldo Disponible: SALDO_BASE (700) + Ingresos - Gastos
+// Saldo Disponible: la app empieza en 0 Bs, como una billetera real.
+// Saldo = ingresos recibidos - gastos pagados (de todos los meses).
+// Misma fórmula que calcular_resumen() en BACKEND/saldo.py.
 const saldoTotal = computed(() => {
   if (esDemo) return saldoDemo.value
-  return SALDO_BASE + ingresosTotal.value - gastosTotal.value
+  const pagados = tipo => sumarMontos(listaMovimientos.value.filter(m => m.tipo === tipo && m.estado === 'pagado'))
+  return pagados('ingreso') - pagados('gasto')
 })
 
 function authHeaders() {
@@ -666,6 +804,7 @@ async function cargarMovimientos() {
         listaMovimientos.value = data.movimientos || []
         guardarEnStorage(listaMovimientos.value)
         await cargarLimite()
+        await aplicarFiltros()
       }
     }
   } catch (e) {
@@ -748,6 +887,137 @@ function gastosDelMesDe(fechaISO, excluirId = null) {
     .reduce((sum, m) => sum + Number(m.monto || 0), 0)
 }
 
+// ===================== Búsqueda y filtros (Issue #2) =====================
+// La consulta la hace el backend (GET /movimientos/filtrar) sobre la base de datos.
+// Los filtros se guardan en la URL, así siguen puestos al recargar la página.
+const FILTROS_VACIOS = { q: '', tipo: '', categoria: '', estado: '', periodo: 'todos', desde: '', hasta: '' }
+const filtros = ref({ ...FILTROS_VACIOS, ...filtrosDesdeUrl() })
+const resultadoFiltro = ref(null)
+const errorFiltro = ref('')
+const cargandoFiltro = ref(false)
+
+function filtrosDesdeUrl() {
+  const desdeUrl = {}
+  for (const clave of Object.keys(FILTROS_VACIOS)) {
+    if (typeof route.query[clave] === 'string') desdeUrl[clave] = route.query[clave]
+  }
+  return desdeUrl
+}
+
+const TEXTO_TIPO = { gasto: 'Gastos', ingreso: 'Ingresos' }
+const TEXTO_ESTADO = { pendiente: 'Pendiente', pagado: 'Pagado' }
+const TEXTO_PERIODO = { este_mes: 'Este mes', mes_anterior: 'Mes anterior' }
+
+const avisoRangoIncompleto = computed(() =>
+  filtros.value.periodo === 'rango' && (!filtros.value.desde || !filtros.value.hasta)
+)
+
+// Solo cuentan los filtros que de verdad se aplican (un rango a medio elegir no filtra)
+const chipsFiltros = computed(() => {
+  const f = filtros.value
+  const chips = []
+  if (f.q.trim()) chips.push({ clave: 'q', texto: `"${f.q.trim()}"` })
+  if (f.tipo) chips.push({ clave: 'tipo', texto: TEXTO_TIPO[f.tipo] })
+  if (f.categoria) chips.push({ clave: 'categoria', texto: f.categoria })
+  if (f.estado) chips.push({ clave: 'estado', texto: TEXTO_ESTADO[f.estado] })
+  if (TEXTO_PERIODO[f.periodo]) chips.push({ clave: 'periodo', texto: TEXTO_PERIODO[f.periodo] })
+  if (f.periodo === 'rango' && f.desde && f.hasta) {
+    chips.push({ clave: 'periodo', texto: `Del ${formatearFechaEspanol(f.desde)} al ${formatearFechaEspanol(f.hasta)}` })
+  }
+  return chips
+})
+
+const hayFiltrosActivos = computed(() => chipsFiltros.value.length > 0)
+
+// El panel de selectores empieza cerrado para no cargar la pantalla
+const mostrarFiltros = ref(false)
+const cantidadFiltrosPanel = computed(() => chipsFiltros.value.filter(c => c.clave !== 'q').length)
+
+const categoriasDelFiltro = computed(() =>
+  filtros.value.tipo ? categorias.value.filter(c => c.tipo === filtros.value.tipo) : categorias.value
+)
+
+// Lo que se ve en la tabla y su total salen de la misma lista
+const listaVisible = computed(() =>
+  hayFiltrosActivos.value ? (resultadoFiltro.value?.movimientos || []) : listaMovimientos.value
+)
+
+const totalesVisibles = computed(() => {
+  if (hayFiltrosActivos.value && resultadoFiltro.value) return resultadoFiltro.value
+  const sumar = tipo => listaVisible.value
+    .filter(m => m.tipo === tipo)
+    .reduce((sum, m) => sum + Number(m.monto || 0), 0)
+  return { cantidad: listaVisible.value.length, total_gastos: sumar('gasto'), total_ingresos: sumar('ingreso') }
+})
+
+function quitarFiltro(clave) {
+  if (clave === 'periodo') {
+    filtros.value = { ...filtros.value, periodo: 'todos', desde: '', hasta: '' }
+  } else {
+    filtros.value = { ...filtros.value, [clave]: '' }
+  }
+}
+
+function quitarTodosLosFiltros() {
+  filtros.value = { ...FILTROS_VACIOS }
+}
+
+async function aplicarFiltros() {
+  errorFiltro.value = ''
+  if (esDemo || !hayFiltrosActivos.value) {
+    resultadoFiltro.value = null
+    return
+  }
+  const f = filtros.value
+  const params = new URLSearchParams()
+  if (f.q.trim()) params.set('q', f.q.trim())
+  for (const clave of ['tipo', 'categoria', 'estado']) if (f[clave]) params.set(clave, f[clave])
+  if (f.periodo !== 'todos' && !avisoRangoIncompleto.value) {
+    params.set('periodo', f.periodo)
+    if (f.periodo === 'rango') {
+      params.set('desde', f.desde)
+      params.set('hasta', f.hasta)
+    }
+  }
+
+  cargandoFiltro.value = true
+  try {
+    const res = await fetch(`${API_URL}/movimientos/filtrar?${params}`, { headers: authHeaders() })
+    if (res.status === 401) return sesionExpirada()
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      errorFiltro.value = data.detail || 'No se pudo aplicar el filtro.'
+      resultadoFiltro.value = { movimientos: [], cantidad: 0, total_gastos: 0, total_ingresos: 0 }
+      return
+    }
+    resultadoFiltro.value = data
+  } catch (e) {
+    errorFiltro.value = 'No se pudo conectar con el servidor para filtrar.'
+  } finally {
+    cargandoFiltro.value = false
+  }
+}
+
+let filtroTimer = null
+watch(filtros, (f) => {
+  // Guardar en la URL solo lo que tiene valor
+  const query = Object.fromEntries(
+    Object.entries(f).filter(([clave, valor]) => valor && valor !== FILTROS_VACIOS[clave])
+  )
+  router.replace({ query })
+  // Espera a que el estudiante termine de escribir antes de consultar
+  clearTimeout(filtroTimer)
+  filtroTimer = setTimeout(aplicarFiltros, 300)
+}, { deep: true })
+
+// Si cambia el tipo, la categoría elegida debe ser de ese tipo
+watch(() => filtros.value.tipo, () => {
+  const { categoria } = filtros.value
+  if (categoria && categoria !== 'General' && !categoriasDelFiltro.value.some(c => c.nombre === categoria)) {
+    filtros.value.categoria = ''
+  }
+})
+
 async function cargarCategorias() {
   try {
     const res = await fetch(`${API_URL}/categorias`)
@@ -817,6 +1087,17 @@ const diaGasto = ref(1)
 const mesGasto = ref('Octubre')
 const guardandoGasto = ref(false)
 const errorMsgGasto = ref('')
+const tipoGasto = ref('gasto')
+const categoriaGasto = ref('')
+
+// Categorías del tipo elegido (las mismas que existen en la base de datos)
+const categoriasDelFormulario = computed(() => categorias.value.filter(c => c.tipo === tipoGasto.value))
+
+watch(categoriasDelFormulario, (lista) => {
+  if (!lista.some(c => c.nombre === categoriaGasto.value)) {
+    categoriaGasto.value = lista.length ? lista[0].nombre : ''
+  }
+}, { immediate: true })
 
 function cerrarModalGasto() {
   abrirModal.value = false
@@ -865,7 +1146,7 @@ async function guardarGastoEstudiantil() {
   const fechaISO = `${anio}-${mesStr}-${diaStr}`
 
   // Regla del límite: avisar antes de enviar si el gasto superaría el límite del mes
-  const motivoLimite = validarGastoConLimite(
+  const motivoLimite = tipoGasto.value === 'gasto' && validarGastoConLimite(
     Number(cantidadGasto.value), gastosDelMesDe(fechaISO), limiteInfo.value.limite
   )
   if (motivoLimite) {
@@ -877,9 +1158,9 @@ async function guardarGastoEstudiantil() {
   const nuevoGasto = {
     id: Date.now(),
     descripcion: descripcionGasto.value.trim(),
-    categoria: 'Transporte',
+    categoria: categoriaGasto.value || 'General',
     monto: Number(cantidadGasto.value),
-    tipo: 'gasto',
+    tipo: tipoGasto.value,
     fecha: fechaISO,
     estado: 'pendiente'
   }
@@ -916,7 +1197,7 @@ async function guardarGastoEstudiantil() {
       const data = await res.json().catch(() => ({}))
       listaMovimientos.value = listaMovimientos.value.filter(m => m !== nuevoGasto)
       guardarEnStorage(listaMovimientos.value)
-      errorMsgGasto.value = data.detail || 'No se pudo registrar el gasto.'
+      errorMsgGasto.value = data.detail || 'No se pudo registrar el movimiento.'
       await cargarLimite()
       return
     }
@@ -933,6 +1214,7 @@ function limpiarFormularioGasto() {
   descripcionGasto.value = ''
   diaGasto.value = 1
   mesGasto.value = 'Octubre'
+  tipoGasto.value = 'gasto'
   abrirModal.value = false
 }
 
@@ -948,6 +1230,16 @@ function mostrarAvisoEstado(texto) {
 
 async function marcarComoPagado(item) {
   if (item.estado === 'pagado') return
+
+  // Regla del saldo: no se paga con dinero que no hay (el backend vuelve a validarlo)
+  if (item.tipo === 'gasto' && saldoTotal.value - Number(item.monto) < 0) {
+    mostrarAvisoEstado(
+      `Saldo insuficiente: "${item.descripcion}" cuesta ${Number(item.monto).toFixed(2)} Bs y solo tienes ` +
+      `${Math.max(saldoTotal.value, 0).toFixed(2)} Bs disponibles. Registra un ingreso o espera a recibirlo para pagar.`
+    )
+    return
+  }
+
   actualizandoEstado.value = item.id
 
   // 1. Transición de estado reactiva en frontend y almacenamiento local (persiste al recargar)
@@ -965,9 +1257,17 @@ async function marcarComoPagado(item) {
       const data = await res.json()
       item.estado = data.estado || 'pagado'
       guardarEnStorage(listaMovimientos.value)
+      // Con filtros, la fila es una copia: se recarga para que la lista y los totales coincidan
+      if (hayFiltrosActivos.value) await cargarMovimientos()
     } else if (res.status === 400) {
       // Transición inválida: ya estaba pagado (por ejemplo, desde otra pestaña)
       mostrarAvisoEstado('Transición inválida: el movimiento ya se encuentra en estado pagado.')
+    } else {
+      // Rechazado por el backend (409: saldo insuficiente): se deshace el cambio y se explica el motivo
+      const data = await res.json().catch(() => ({}))
+      item.estado = 'pendiente'
+      guardarEnStorage(listaMovimientos.value)
+      mostrarAvisoEstado(data.detail || 'No se pudo marcar como pagado.')
     }
   } catch (err) {
     console.warn('Gasto marcado como pagado localmente (servidor no disponible).')
@@ -1337,6 +1637,11 @@ onUnmounted(() => {
   color: #15803D;
 }
 
+.texto-alerta {
+  color: #A63A3A;
+  font-weight: 600;
+}
+
 .limite-barra {
   height: 12px;
   background: #E2E8F0;
@@ -1363,6 +1668,185 @@ onUnmounted(() => {
   .limite-cifras {
     grid-template-columns: 1fr;
   }
+}
+
+/* Búsqueda y filtros (Issue #2) */
+.filtros-card {
+  background: #FFFFFF;
+  border-radius: 10px;
+  padding: clamp(16px, 1.2vw, 22px) clamp(18px, 1.4vw, 26px);
+  box-shadow: 0 4px 14px rgba(15, 35, 65, 0.08);
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filtros-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.actions-bar-filtros {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.buscador {
+  position: relative;
+  flex: 1 1 260px;
+  max-width: 460px;
+}
+
+.buscador-icono {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #3B78B0;
+  pointer-events: none;
+}
+
+/* Más específico que .filtro-input para que la lupa no tape el texto */
+.buscador .buscador-input {
+  padding: 11px 14px 11px 42px;
+  border: 1.5px solid #94A3B8;
+  font-size: clamp(15px, 1vw, 17px);
+}
+
+.buscador .buscador-input::placeholder {
+  color: #64748B;
+}
+
+.buscador .buscador-input:focus {
+  border-color: #3B78B0;
+}
+
+.btn-filtros {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: #FFFFFF;
+  color: #1E3A5F;
+  border: 1.5px solid #CBD5E1;
+  padding: clamp(9px, 0.65vw, 12px) 16px;
+  border-radius: 6px;
+  font-size: clamp(14px, 0.95vw, 16px);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-filtros:hover,
+.btn-filtros-activo {
+  border-color: #3B78B0;
+  color: #3B78B0;
+}
+
+.contador-filtros {
+  background: #3B78B0;
+  color: #FFFFFF;
+  border-radius: 999px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.actions-bar-filtros .btn-new-mov {
+  margin-left: auto;
+}
+
+.solo-lector {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.filtro-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.filtro-label {
+  font-size: clamp(13px, 0.85vw, 15px);
+  font-weight: 600;
+  color: #334155;
+}
+
+.filtro-input {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid #CBD5E1;
+  border-radius: 6px;
+  font-size: clamp(14px, 0.95vw, 16px);
+  color: #1E293B;
+  background: #FFFFFF;
+  font-family: inherit;
+}
+
+.filtro-input:focus {
+  outline: 2px solid #3B78B0;
+  outline-offset: 1px;
+  border-color: #3B78B0;
+}
+
+.filtro-aviso {
+  font-size: clamp(13px, 0.85vw, 15px);
+  color: #92400E;
+}
+
+.filtros-activos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.chip-filtro {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #EAF2FA;
+  color: #1E3A5F;
+  border: 1px solid #B6D0EA;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: clamp(13px, 0.85vw, 15px);
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.chip-filtro:hover {
+  background: #DCE9F6;
+}
+
+.btn-quitar-filtros {
+  background: none;
+  border: none;
+  color: #A63A3A;
+  font-size: clamp(13px, 0.85vw, 15px);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 4px 6px;
+}
+
+.filtro-total {
+  font-size: clamp(14px, 0.95vw, 16px);
+  color: #334155;
+  border-top: 1px solid #E2E8F0;
+  padding-top: 10px;
 }
 
 .actions-bar {

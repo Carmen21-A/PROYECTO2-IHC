@@ -20,6 +20,15 @@ from datetime import date
 import models
 
 
+def registrar_ingreso_recibido(db_session, monto=100.00):
+    """La app empieza en 0 Bs: para pagar un gasto el estudiante necesita dinero recibido."""
+    db_session.add(models.Movimiento(
+        usuario_id=1, monto=monto, tipo="ingreso", descripcion="Mesada",
+        fecha=date(2026, 10, 1), estado="pagado"
+    ))
+    db_session.commit()
+
+
 # =============================================================================
 # PRUEBA 1: EL ESTADO INICIAL ES EL CORRECTO
 # =============================================================================
@@ -56,7 +65,8 @@ def test_02_accion_realiza_transicion_esperada(client, db_session):
     Verifica que al invocar la acción 'Marcar como pagado',
     el movimiento transicione correctamente de 'pendiente' a 'pagado'.
     """
-    # 1. Crear movimiento inicial en estado pendiente
+    # 1. Crear movimiento inicial en estado pendiente (con dinero recibido para poder pagarlo)
+    registrar_ingreso_recibido(db_session)
     mov = models.Movimiento(
         usuario_id=1,
         monto=25.00,
@@ -127,7 +137,8 @@ def test_04_demas_datos_del_elemento_se_conservan(client, db_session):
     Verifica que la transición de estado a 'pagado' no mute, corrompa
     ni borre los demás atributos del movimiento (monto, descripcion, fecha, usuario_id).
     """
-    # 1. Crear movimiento con datos específicos
+    # 1. Crear movimiento con datos específicos (con dinero recibido para poder pagarlo)
+    registrar_ingreso_recibido(db_session)
     monto_original = 48.50
     descripcion_original = "Libros de Texto (Uni)"
     fecha_original = date(2026, 10, 3)

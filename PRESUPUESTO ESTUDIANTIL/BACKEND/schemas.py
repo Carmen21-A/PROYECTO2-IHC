@@ -60,11 +60,23 @@ class MovimientoOut(BaseModel):
     class Config:
         from_attributes = True
 
+class ResumenMes(BaseModel):
+    ingresos_del_mes: float
+    gastos_del_mes: float
+    saldo_disponible: float
+
 class ResumenFinanciero(BaseModel):
     saldo_disponible: float
     ingresos_del_mes: float
     gastos_del_mes: float
+    resumen_mes: Optional[ResumenMes] = None
     movimientos: List[MovimientoOut]
+
+class ResultadoFiltro(BaseModel):
+    movimientos: List[MovimientoOut]
+    cantidad: int
+    total_ingresos: float
+    total_gastos: float
 
 class CategoriaOut(BaseModel):
     id: int

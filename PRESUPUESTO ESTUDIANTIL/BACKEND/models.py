@@ -5,6 +5,20 @@ from database import Base
 
 DEMO_EMAIL = "estudiante@demo.com"
 
+# Las mismas categorías que BASE DE DATOS/seed.sql (nombre, tipo, icono)
+CATEGORIAS_INICIALES = [
+    ("Comida y Almuerzos", "gasto", "utensils"),
+    ("Transporte y Pasajes", "gasto", "bus"),
+    ("Fotocopias y Libros", "gasto", "book-open"),
+    ("Ocio y Salidas", "gasto", "coffee"),
+    ("Servicios e Internet", "gasto", "wifi"),
+    ("Otros Gastos", "gasto", "more-horizontal"),
+    ("Beca Universitaria", "ingreso", "award"),
+    ("Apoyo Familiar", "ingreso", "heart"),
+    ("Trabajo / Pasantía", "ingreso", "briefcase"),
+    ("Otros Ingresos", "ingreso", "dollar-sign"),
+]
+
 class Usuario(Base):
     __tablename__ = "usuarios"
 

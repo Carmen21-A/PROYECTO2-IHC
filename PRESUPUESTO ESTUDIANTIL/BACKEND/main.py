@@ -23,6 +23,13 @@ try:
                 conn.execute(text("ALTER TABLE usuarios ADD COLUMN limite_mensual NUMERIC(10, 2) DEFAULT NULL;"))
                 conn.commit()
                 print("[OK] Columna 'limite_mensual' agregada a tabla usuarios exitosamente.")
+    # Sin categorías en la BD, los movimientos se guardarían sin categoría y no se podrían filtrar
+    from sqlalchemy.orm import Session
+    with Session(engine) as db:
+        if db.query(models.Categoria).count() == 0:
+            db.add_all([models.Categoria(nombre=n, tipo=t, icono=i) for n, t, i in models.CATEGORIAS_INICIALES])
+            db.commit()
+            print("[OK] Categorias iniciales cargadas.")
 except Exception as e:
     print(f"Nota de conexion a la base de datos: {e}")
 

@@ -11,8 +11,14 @@ from correo import enviar_codigo_recuperacion
 CODIGO_MINUTOS = 10
 CODIGO_MAX_INTENTOS = 5
 
+
+
+#Crea un grupo de endpoints (router) donde todas las direcciones 
+# empiezan con /auth, que en la documentación aparecerán bajo el 
+# título 'Autenticación y Usuarios
 router = APIRouter(prefix="/auth", tags=["Autenticación y Usuarios"])
 
+# endpoint POST /auth/registro: el que crea una cuenta nueva.
 @router.post("/registro", response_model=schemas.TokenResponse)
 def registrar_usuario(datos: schemas.UsuarioRegistro, db: Session = Depends(get_db)):
     existe = db.query(models.Usuario).filter(models.Usuario.email == datos.email.lower()).first()
@@ -37,7 +43,8 @@ def registrar_usuario(datos: schemas.UsuarioRegistro, db: Session = Depends(get_
         "token": token,
         "usuario": nuevo_usuario
     }
-
+#endpoint POST /auth/login: el que inicia sesión. 
+#
 @router.post("/login", response_model=schemas.TokenResponse)
 def login(datos: schemas.UsuarioLogin, db: Session = Depends(get_db)):
     usuario = db.query(models.Usuario).filter(models.Usuario.email == datos.email.lower()).first()
@@ -47,7 +54,7 @@ def login(datos: schemas.UsuarioLogin, db: Session = Depends(get_db)):
             detail="Correo o contraseña incorrectos."
         )
 
-    token = create_access_token({"sub": str(usuario.id), "email": usuario.email})
+    token = create_access_token({"sub": str(usuario.id), "email": usuario.email})  #pulsera, que el frontend enviará en cada petición para demostrar quién es
 
     return {
         "token": token,
@@ -70,9 +77,11 @@ def _validar_codigo(db: Session, usuario, codigo: str):
         restantes = CODIGO_MAX_INTENTOS - usuario.codigo_intentos
         if restantes <= 0:
             raise HTTPException(status_code=400, detail="Código incorrecto. Ya no te quedan intentos: solicita un código nuevo.")
-        palabra = "intento" if restantes == 1 else "intentos"
+        palabra = "intento" if restantes == 1 else "intentos"                                                                       #Si le queda exactamente 1 intento, la palabra es 'intento'; si no, la palabra es 'intentos'
         raise HTTPException(status_code=400, detail=f"Código incorrecto. Te quedan {restantes} {palabra}.")
 
+# endpoint POST /auth/recuperar/solicitar: el primer paso de
+#  "¿Olvidaste tu contraseña?"
 @router.post("/recuperar/solicitar")
 def solicitar_codigo(datos: schemas.SolicitarCodigo, db: Session = Depends(get_db)):
     usuario = _buscar_usuario(db, datos.email)
@@ -83,7 +92,7 @@ def solicitar_codigo(datos: schemas.SolicitarCodigo, db: Session = Depends(get_d
         )
 
     if usuario:
-        codigo = f"{secrets.randbelow(10000):04d}"
+        codigo = f"{secrets.randbelow(10000):04d}"   #genera un numero entre 0 y 9999 y lo convierte a digito de 4
         usuario.token_recuperacion = hash_password(codigo)
         usuario.codigo_expira = datetime.utcnow() + timedelta(minutes=CODIGO_MINUTOS)
         usuario.codigo_intentos = 0
@@ -99,16 +108,20 @@ def solicitar_codigo(datos: schemas.SolicitarCodigo, db: Session = Depends(get_d
 
     return {"mensaje": "Si el correo está registrado, te enviamos un código de 4 dígitos."}
 
+#Este es el endpoint POST /auth/recuperar/verificar: el segundo 
+# paso de la recuperación de contraseña.
 @router.post("/recuperar/verificar")
 def verificar_codigo(datos: schemas.VerificarCodigo, db: Session = Depends(get_db)):
     _validar_codigo(db, _buscar_usuario(db, datos.email), datos.codigo)
     return {"mensaje": "Código verificado."}
 
+#endpoint POST /auth/recuperar/restablecer: el tercer y último paso
+#  de la recuperación. El usuario escribe su contraseña nueva 
 @router.post("/recuperar/restablecer")
 def restablecer_password(datos: schemas.RestablecerPassword, db: Session = Depends(get_db)):
     usuario = _buscar_usuario(db, datos.email)
     _validar_codigo(db, usuario, datos.codigo)
-    if len(datos.nueva_password) < 6:
+    if len(datos.nueva_password) < 6:       #length
         raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 6 caracteres.")
 
     usuario.password_hash = hash_password(datos.nueva_password)
@@ -119,6 +132,8 @@ def restablecer_password(datos: schemas.RestablecerPassword, db: Session = Depen
 
     return {"mensaje": "Contraseña actualizada exitosamente."}
 
+#endpoint GET /auth/me: devuelve los datos del usuario que 
+# inició sesión. 
 @router.get("/me", response_model=schemas.UsuarioOut)
 def obtener_perfil(usuario: models.Usuario = Depends(get_current_user)):
     return usuario

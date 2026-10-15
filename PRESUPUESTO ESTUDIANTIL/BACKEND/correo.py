@@ -12,7 +12,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "Presupuesto Estudiantil")
 
 def correo_configurado() -> bool:
-    return bool(SMTP_USER and SMTP_PASSWORD)
+    return bool(SMTP_USER and SMTP_PASSWORD)                        #Devuelve verdadero si hay un usuario de correo Y una contraseña. 
 
 def enviar_codigo_recuperacion(destino: str, nombre: str, codigo: str, minutos: int):
     if not correo_configurado():
@@ -42,7 +42,7 @@ def enviar_codigo_recuperacion(destino: str, nombre: str, codigo: str, minutos: 
 </div>
 """, subtype="html")
 
-    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as servidor:
-        servidor.starttls()
-        servidor.login(SMTP_USER, SMTP_PASSWORD)
-        servidor.send_message(msg)
+    with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=15) as servidor:  #Crea una coneccion SMTP al servidor de correo especificado por HOST y PORT, tiene 15 segundos para conectarse al servidor, sino se cierra automaticamente.
+        servidor.starttls()                                      #Activa el cifrado TLS (Transport Layer Security) sobre la conexión
+        servidor.login(SMTP_USER, SMTP_PASSWORD)                 #Inicia sesion en el servidor con el usuario y contraseña especificados
+        servidor.send_message(msg)                             #Envía el mensaje

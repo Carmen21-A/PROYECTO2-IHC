@@ -5,9 +5,11 @@ from database import get_db
 import models
 import schemas
 
+#crea el grupo de endpoints de categorías, que vivirán en /categorias.
 router = APIRouter(prefix="/categorias", tags=["Categorías"])
-
+#endpoint de tipo GET. "" es la dirección dentro del router. response_model=List[schemas.CategoriaOut] define el formato de la respuesta: una lista (List) de objetos con la forma de CategoriaOut
 @router.get("", response_model=List[schemas.CategoriaOut])
+#listar_categorias recibe una conexión a la base de datos, que le da get_db, para poder consultar las categorías.
 def listar_categorias(db: Session = Depends(get_db)):
     categorias = db.query(models.Categoria).all()
     if not categorias:

@@ -32,9 +32,9 @@ class Usuario(Base):
     limite_mensual = Column(Numeric(10, 2), nullable=True)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
-    movimientos = relationship("Movimiento", back_populates="usuario", cascade="all, delete-orphan")
+    movimientos = relationship("Movimiento", back_populates="usuario", cascade="all, delete-orphan")  #tiene muchos movimientos, y si se borra el usuario, se borran todos sus movimientos también.
 
-    @property
+    @property                                                          # es un decorador de Python. Lo que hace es convertir un método en algo que se usa como si fuera un atributo
     def es_demo(self) -> bool:
         return self.email == DEMO_EMAIL
 
@@ -44,7 +44,7 @@ class Categoria(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(50), nullable=False)
     tipo = Column(String(10), nullable=False)
-    icono = Column(String(50), default="tag")
+    icono = Column(String(50), default="tag")                      #ícono por defecto es 'tag'.
 
 class Movimiento(Base):
     __tablename__ = "movimientos"
@@ -59,4 +59,4 @@ class Movimiento(Base):
     estado = Column(String(20), default="pendiente", nullable=False)
     creado_en = Column(DateTime, default=datetime.utcnow)
 
-    usuario = relationship("Usuario", back_populates="movimientos")
+    usuario = relationship("Usuario", back_populates="movimientos")     #Desde un movimiento, puedo acceder al usuario que lo creó

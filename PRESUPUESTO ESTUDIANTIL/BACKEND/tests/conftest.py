@@ -19,10 +19,13 @@ from sqlalchemy.pool import StaticPool
 # Base de datos SQLite aislada en memoria para pruebas rápidas e independientes
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///:memory:"
 
-engine_test = create_engine(
+
+#prepara todo para las pruebas. Su trabajo es crear una base de 
+# datos falsa, solo para las pruebas
+engine_test = create_engine(                #Crea el motor de conexión a la base de datos de pruebas y guárdalo en engine_test.
     SQLALCHEMY_TEST_DATABASE_URL,
-    connect_args={"check_same_thread": False},
-    poolclass=StaticPool
+    connect_args={"check_same_thread": False},   #permitiendo que la conexión se use desde distintos hilos..
+    poolclass=StaticPool                          #y usa siempre la misma conexión
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine_test)
 
@@ -45,18 +48,20 @@ def db_session():
     finally:
         db.close()
         Base.metadata.drop_all(bind=engine_test)
+        #De todas las tablas que conoce Base, bórralas todas en la
+        #  base de datos de pruebas.
 
 # Fixture de cliente FastAPI con autenticación y BD simuladas
 @pytest.fixture(scope="function")
 def client(db_session):
-    def override_get_db():
+    def override_get_db():   #No conecta a la BD real, Define una función de reemplazo
         try:
             yield db_session
         finally:
             pass
 
-    def override_get_current_user():
-        return db_session.query(models.Usuario).filter(models.Usuario.id == 1).first()
+    def override_get_current_user():                                #Define una función de reemplazo para get_current_user
+        return db_session.query(models.Usuario).filter(models.Usuario.id == 1).first()    #devuelve directamente el usuario de prueba (el de id 1).
 
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[get_current_user] = override_get_current_user

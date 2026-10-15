@@ -28,7 +28,7 @@ MENSAJE_MONTO_BLOQUEADO = (
 def validar_edicion(mov: models.Movimiento, datos: schemas.MovimientoUpdate):
     """Regla de estado (Tarea 3): un movimiento pagado no permite modificar su monto."""
     estado_actual = getattr(mov, "estado", "pendiente") or "pendiente"
-    if estado_actual == "pagado" and datos.monto is not None             and round(float(datos.monto), 2) != round(float(mov.monto), 2):
+    if estado_actual == "pagado" and datos.monto is not None   and round(float(datos.monto), 2) != round(float(mov.monto), 2):
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail=MENSAJE_MONTO_BLOQUEADO
@@ -57,7 +57,8 @@ def obtener_movimiento_propio(movimiento_id: int, db: Session, usuario: models.U
         raise HTTPException(status_code=404, detail="Movimiento no encontrado.")
     return mov
 
-def serializar_movimiento(mov: models.Movimiento, db: Session) -> dict:
+#"serializar": convertir un objeto de Python en un formato simple que se pueda enviar al frontend como JSON. 
+def serializar_movimiento(mov: models.Movimiento, db: Session) -> dict:      #->dict funcion devuelve un diccionario
     categoria_nombre = "General"
     if mov.categoria_id:
         cat = db.query(models.Categoria).filter(models.Categoria.id == mov.categoria_id).first()
@@ -72,6 +73,9 @@ def serializar_movimiento(mov: models.Movimiento, db: Session) -> dict:
         "fecha": mov.fecha.strftime("%Y-%m-%d") if hasattr(mov.fecha, 'strftime') else str(mov.fecha),
         "estado": getattr(mov, "estado", "pendiente") or "pendiente"
     }
+
+#Es el endpoint GET /movimientos que muestra (lista) los movimientos
+#del usuario ordenados del más nuevo al más viejo, los convierte al formato del frontend
 
 @router.get("", response_model=schemas.ResumenFinanciero)
 def listar_movimientos(
@@ -108,7 +112,7 @@ def listar_movimientos(
             "categoria": categoria_nombre,
             "monto": monto_float,
             "tipo": m.tipo,
-            "fecha": m.fecha.strftime("%Y-%m-%d") if hasattr(m.fecha, 'strftime') else str(m.fecha),
+            "fecha": m.fecha.strftime("%Y-%m-%d")                     if hasattr(m.fecha, 'strftime') else str(m.fecha),
             "estado": estado_val
         })
 
@@ -118,7 +122,7 @@ def listar_movimientos(
     resumen_mes = calcular_resumen(
         [{"tipo": m.tipo, "monto": m.monto, "estado": m.estado or "pendiente", "fecha": m.fecha}
          for m in movimientos_db],
-        date.today()
+        date.today()  #calcular los ingresos y gastos del mes actual
     )
 
     return {
@@ -129,17 +133,21 @@ def listar_movimientos(
         "movimientos": movimientos_out
     }
 
+
+#Cuando el frontend haga una petición GET a /movimientos/filtrar, 
+#Se ejecutará la función de abajo. La respuesta tendrá el formato ResultadoFiltro
+# 
 @router.get("/filtrar", response_model=schemas.ResultadoFiltro)
 def filtrar_movimientos(
-    q: Optional[str] = None,
+    q: Optional[str] = None,                               #descripcion
     tipo: Optional[str] = None,
     categoria: Optional[str] = None,
     estado: Optional[str] = None,
     periodo: Optional[str] = None,
     desde: Optional[str] = None,
     hasta: Optional[str] = None,
-    db: Session = Depends(get_db),
-    usuario: models.Usuario = Depends(get_current_user)
+    db: Session = Depends(get_db),                 #FastAPI le entrega la conexión a la base de datos
+    usuario: models.Usuario = Depends(get_current_user) # el usuario que inició sesión
 ):
     """Issue #2: búsqueda y filtros combinables, con el total de lo que se encontró."""
     try:
@@ -150,25 +158,28 @@ def filtrar_movimientos(
     movimientos = [serializar_movimiento(m, db) for m in consultar_movimientos(db, usuario.id, filtros)]
     return {"movimientos": movimientos, **calcular_totales(movimientos)}
 
+
+#endpoint POST /movimientos: el que crea un movimiento nuevo
+# 
 @router.post("", response_model=schemas.MovimientoOut)
 def crear_movimiento(
-    datos: schemas.MovimientoCreate,
-    db: Session = Depends(get_db),
-    usuario: models.Usuario = Depends(get_current_user)
+    datos: schemas.MovimientoCreate,                                #datos del formulario
+    db: Session = Depends(get_db),                                    #conexion a la BD
+    usuario: models.Usuario = Depends(get_current_user)               #usuario q inicio sesion
 ):
     bloquear_demo(usuario)
 
     cat = None
     if datos.categoria:
         cat = db.query(models.Categoria).filter(models.Categoria.nombre == datos.categoria).first()
-    cat_id = cat.id if cat else None
+    cat_id = cat.id if cat else None                               #si hay cat.id guarda, sino hay deja NONE
 
     fecha_val = datetime.utcnow().date()
     if datos.fecha:
         try:
             fecha_val = datetime.strptime(datos.fecha, "%Y-%m-%d").date()
-        except Exception:
-            pass
+        except Exception:                                          #si hay una excepción (error), haz esto otro
+            pass                                                    # no hagas nada
 
     if (datos.tipo or "gasto") == "gasto":
         verificar_limite_mensual(db, usuario, datos.monto, fecha_val)
@@ -198,6 +209,12 @@ def crear_movimiento(
         "estado": nuevo.estado
     }
 
+
+
+
+#endpoint PATCH /movimientos/{movimiento_id}/pagar: el que marca un 
+# movimiento como pagado. Es el botón "Pagar" de la tabla.
+# #
 @router.patch("/{movimiento_id}/pagar", response_model=schemas.MovimientoOut)
 def marcar_como_pagado(
     movimiento_id: int,
@@ -214,7 +231,7 @@ def marcar_como_pagado(
     if not mov:
         raise HTTPException(status_code=404, detail="Movimiento no encontrado.")
 
-    if getattr(mov, "estado", "pendiente") == "pagado":
+    if getattr(mov, "estado", "pendiente") == "pagado":          #Si el atributo estado de mov es igual a 'pagado', entonces..  SI NO HAY PAGADO USA PENDIENTE
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Transición inválida: el movimiento ya se encuentra en estado pagado."
@@ -243,10 +260,14 @@ def marcar_como_pagado(
         "estado": mov.estado
     }
 
+
+# endpoint PUT /movimientos/{movimiento_id}: el que edita un 
+# movimiento que ya existe
+# #
 @router.put("/{movimiento_id}", response_model=schemas.MovimientoOut)
 def editar_movimiento(
-    movimiento_id: int,
-    datos: schemas.MovimientoUpdate,
+    movimiento_id: int,                                          #Recibe numero de movimiento
+    datos: schemas.MovimientoUpdate,                             #datos del formulario
     db: Session = Depends(get_db),
     usuario: models.Usuario = Depends(get_current_user)
 ):
@@ -256,7 +277,7 @@ def editar_movimiento(
     validar_edicion(mov, datos)
 
     if datos.descripcion is not None:
-        descripcion = datos.descripcion.strip()
+        descripcion = datos.descripcion.strip()                   #quítale los espacios del principio y del final y guárdala en descripcion."
         if not descripcion:
             raise HTTPException(status_code=400, detail="La descripción no puede estar vacía.")
         mov.descripcion = descripcion
@@ -279,6 +300,10 @@ def editar_movimiento(
     db.refresh(mov)
     return serializar_movimiento(mov, db)
 
+
+#endpoint DELETE /movimientos/{movimiento_id}: el que elimina 
+# un movimiento. 
+# #
 @router.delete("/{movimiento_id}")
 def eliminar_movimiento(
     movimiento_id: int,
@@ -293,4 +318,4 @@ def eliminar_movimiento(
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=motivo)
     db.delete(mov)
     db.commit()
-    return {"ok": True, "id": movimiento_id}
+    return {"ok": True, "id": movimiento_id}                        #Movimiento.id borrado

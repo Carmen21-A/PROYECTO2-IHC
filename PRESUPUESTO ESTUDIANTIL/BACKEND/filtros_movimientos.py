@@ -1,6 +1,8 @@
 """
 Búsqueda y filtros de movimientos - Presupuesto Estudiantil
 Issue #2: Buscar y filtrar movimientos
+[H7 - Flexibilidad y eficiencia de uso]:
+Aceleradores de búsqueda instantánea y filtros combinables para usuarios frecuentes.
 
 - crear_filtros(): valida lo que eligió el estudiante (regla pura).
 - rango_del_periodo(): convierte "este mes", "mes anterior" o un rango en fechas (regla pura).
@@ -35,12 +37,12 @@ def _limpiar(valor):
     if valor is None:
         return None
     valor = str(valor).strip()
-    return valor or None
+    return valor or None                                            #y si queda vacío, también devuelve nada.
 
 
 def _fecha(valor, nombre):
     try:
-        return date.fromisoformat(valor)
+        return date.fromisoformat(valor)                             #intenta convertir un texto a fecha
     except (TypeError, ValueError):
         raise ValueError(f"La fecha '{nombre}' no es válida. Usa el formato AAAA-MM-DD.")
 
@@ -74,7 +76,7 @@ def rango_del_periodo(filtros: Filtros, hoy: date):
     """Devuelve (inicio, fin) del periodo, ambos incluidos, o (None, None) si es 'todos'."""
     if filtros.periodo == "este_mes":
         inicio = hoy.replace(day=1)
-        fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)
+        fin = (inicio.replace(day=28) + timedelta(days=4)).replace(day=1) - timedelta(days=1)    #calcula el ultimo dia del mes. 
         return inicio, fin
     if filtros.periodo == "mes_anterior":
         fin = hoy.replace(day=1) - timedelta(days=1)
@@ -87,13 +89,13 @@ def rango_del_periodo(filtros: Filtros, hoy: date):
 def consultar_movimientos(db, usuario_id: int, filtros: Filtros, hoy: date = None):
     """Movimientos del usuario que cumplen TODOS los filtros a la vez, del más reciente al más antiguo."""
     hoy = hoy or date.today()
-    consulta = db.query(models.Movimiento).outerjoin(
-        models.Categoria, models.Movimiento.categoria_id == models.Categoria.id
-    ).filter(models.Movimiento.usuario_id == usuario_id)
+    consulta = db.query(models.Movimiento).outerjoin(                   #Pregunta en movimiento y junta
+        models.Categoria, models.Movimiento.categoria_id == models.Categoria.id   #la tabla categoria con su respectivo 
+    ).filter(models.Movimiento.usuario_id == usuario_id)                           #filtro movimientos del usuario
 
     if filtros.texto:
         patron = "%" + filtros.texto.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        consulta = consulta.filter(or_(
+        consulta = consulta.filter(or_(              #filtra la consulta donde se cumpla:
             models.Movimiento.descripcion.ilike(patron, escape="\\"),
             models.Categoria.nombre.ilike(patron, escape="\\"),
         ))
@@ -116,7 +118,7 @@ def consultar_movimientos(db, usuario_id: int, filtros: Filtros, hoy: date = Non
 
 def calcular_totales(movimientos) -> dict:
     """Totales de la lista filtrada: lo que se suma es exactamente lo que se ve."""
-    ingresos = sum(float(m["monto"]) for m in movimientos if m["tipo"] == "ingreso")
+    ingresos = sum(float(m["monto"]) for m in movimientos if m["tipo"] == "ingreso")                   #SOLO SUMA INGRESOS
     gastos = sum(float(m["monto"]) for m in movimientos if m["tipo"] == "gasto")
     return {
         "cantidad": len(movimientos),

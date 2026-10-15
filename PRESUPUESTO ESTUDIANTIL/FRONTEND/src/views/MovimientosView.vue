@@ -49,7 +49,9 @@
         <div class="limite-cabecera">
           <div>
             <h2 id="titulo-limite" class="limite-titulo">Límite mensual de gastos</h2>
+            <!-- /// [H10 - Ayuda y documentación: período computado en el límite] /// -->
             <span class="card-subtext">{{ limiteInfo.mes }} · cuenta gastos pagados y pendientes del mes</span>
+            <!-- /// ============================================================= /// -->
           </div>
           <button type="button" class="btn-limite" @click="abrirModalLimite">
             {{ limiteInfo.limite === null ? 'Definir límite' : 'Cambiar límite' }}
@@ -60,6 +62,7 @@
           Aún no definiste un límite. Llevas gastado <strong>{{ limiteInfo.gastado_mes.toFixed(2) }} Bs</strong> este mes.
         </p>
         <template v-else>
+          <!-- /// [H2 - Relación con el mundo real: vocabulario financiero cotidiano del estudiante] /// -->
           <div class="limite-cifras">
             <div>
               <span class="limite-etiqueta">Llevo gastado</span>
@@ -74,6 +77,7 @@
               <span class="limite-valor amount-navy">{{ limiteInfo.limite.toFixed(2) }} Bs</span>
             </div>
           </div>
+          <!-- /// =================================================================================== /// -->
           <div
             class="limite-barra"
             role="progressbar"
@@ -84,10 +88,13 @@
           >
             <div :class="['limite-barra-relleno', porcentajeLimite >= 90 ? 'barra-alerta' : (porcentajeLimite >= 70 ? 'barra-aviso' : '')]" :style="{ width: porcentajeLimite + '%' }"></div>
           </div>
+          <!-- /// [H10 - Ayuda y documentación: porcentaje de consumo visible] /// -->
           <span class="card-subtext">Usaste el {{ porcentajeLimite }}% de tu límite.</span>
+          <!-- /// ============================================================ /// -->
         </template>
       </section>
 
+      <!-- /// [H7 - Flexibilidad y eficiencia de uso: barra de búsqueda y filtros combinables] /// -->
       <!-- Barra de acciones: buscador + botón de filtros + registrar (Issue #2) -->
       <div :class="['actions-bar', { 'actions-bar-filtros': !esDemo }]">
         <template v-if="!esDemo">
@@ -202,6 +209,7 @@
           </template>
         </p>
       </section>
+      <!-- /// ================================================================================= /// -->
 
       <!-- Tarjeta Principal de Movimientos para cuentas de usuario (Docente / IHC) -->
       <div v-if="!esDemo" class="tarjeta-estudiantil-card">
@@ -417,6 +425,33 @@
           {{ tipoGasto === 'ingreso' ? 'Registra el dinero que recibiste' : 'Registra los detalles del gasto universitario' }}
         </p>
 
+        <!-- /// [H6 - Reconocer antes que recordar: contexto financiero visible en el modal] /// -->
+        <div v-if="tipoGasto === 'gasto' && limiteInfo.limite !== null" class="limite-contexto-modal" role="status" aria-live="polite">
+          <div class="limite-contexto-cabecera">
+            <span class="limite-contexto-label">Presupuesto del mes:</span>
+            <!-- /// [H1 - Visibilidad del estado del sistema: disponibilidad en tiempo real] /// -->
+            <span :class="['limite-contexto-badge', limiteInfo.disponible > 0 ? 'badge-disp-ok' : 'badge-disp-alerta']">
+              Disponible: {{ limiteInfo.disponible.toFixed(2) }} Bs
+            </span>
+            <!-- /// ========================================================================= /// -->
+          </div>
+          <div class="limite-contexto-detalle">
+            <span>Límite fijado: {{ limiteInfo.limite.toFixed(2) }} Bs · Llevas gastado: {{ limiteInfo.gastado_mes.toFixed(2) }} Bs</span>
+          </div>
+          <!-- /// [H5 - Prevención de errores: advertencia anticipada de exceso al escribir] /// -->
+          <p v-if="excesoPreventivoGasto > 0" class="aviso-exceso-preventivo">
+            ⚠️ <strong>Atención:</strong> Esta cantidad supera tu límite disponible por <strong>{{ excesoPreventivoGasto.toFixed(2) }} Bs</strong>.
+          </p>
+          <!-- /// ========================================================================= /// -->
+          <!-- /// [H1 - Visibilidad del estado del sistema: cálculo del saldo que le quedará] /// -->
+          <p v-else-if="cantidadGasto && cantidadGasto > 0 && cantidadGasto <= limiteInfo.disponible" class="aviso-queda-preventivo">
+            ✓ Con este gasto te quedarán <strong>{{ (limiteInfo.disponible - cantidadGasto).toFixed(2) }} Bs</strong> disponibles.
+          </p>
+          <!-- /// =========================================================================== /// -->
+        </div>
+        <!-- /// ============================================================================== /// -->
+
+        <!-- /// [H8 - Diseño estético y minimalista: formulario enfocado en campos indispensables] /// -->
         <form @submit.prevent="guardarGastoEstudiantil" class="dashboard-form">
           <!-- Tipo de movimiento (Issue #2: permite registrar ingresos para poder filtrarlos) -->
           <div class="form-grupo-custom">
@@ -489,7 +524,16 @@
             </div>
           </div>
 
-          <p v-if="errorMsgGasto" class="form-error-custom">{{ errorMsgGasto }}</p>
+          <!-- /// [H9 - Reconocer, diagnosticar y recuperarse de errores: acción constructiva] /// -->
+          <div v-if="errorMsgGasto" class="form-error-custom caja-error-recuperable" role="alert">
+            <p class="texto-error-bloqueo">{{ errorMsgGasto }}</p>
+            <div v-if="limiteInfo.disponible !== null && limiteInfo.disponible > 0 && Number(cantidadGasto) > limiteInfo.disponible" class="acciones-recuperacion-error">
+              <button type="button" class="btn-recuperar-disponible" @click="ajustarMontoAlDisponible">
+                💡 Ajustar monto a {{ limiteInfo.disponible.toFixed(2) }} Bs disponibles
+              </button>
+            </div>
+          </div>
+          <!-- /// =========================================================================== /// -->
 
           <div class="dashboard-modal-actions">
             <button type="button" @click="cerrarModalGasto" class="btn-cancelar-modal">
@@ -500,6 +544,7 @@
             </button>
           </div>
         </form>
+        <!-- /// ================================================================================= /// -->
       </div>
     </div>
 
@@ -540,8 +585,19 @@
           <p v-if="errorLimite" id="error-limite" class="form-error-custom" role="alert">{{ errorLimite }}</p>
 
           <div class="dashboard-modal-actions">
+            <!-- /// [H3 - Control y libertad del usuario: botón de salida de emergencia para quitar límite] /// -->
+            <button
+              v-if="limiteInfo.limite !== null"
+              type="button"
+              class="btn-quitar-limite"
+              :disabled="guardandoLimite || quitandoLimite"
+              @click="quitarLimite"
+            >
+              {{ quitandoLimite ? 'Quitando...' : 'Quitar límite' }}
+            </button>
+            <!-- /// ===================================================================================== /// -->
             <button type="button" @click="cerrarModalLimite" class="btn-cancelar-modal">Cancelar</button>
-            <button type="submit" class="btn-guardar-principal" :disabled="guardandoLimite">
+            <button type="submit" class="btn-guardar-principal" :disabled="guardandoLimite || quitandoLimite">
               {{ guardandoLimite ? 'Guardando...' : 'Guardar límite' }}
             </button>
           </div>
@@ -820,6 +876,7 @@ const modalLimite = ref(false)
 const limiteEscrito = ref('')
 const errorLimite = ref('')
 const guardandoLimite = ref(false)
+const quitandoLimite = ref(false)
 
 const porcentajeLimite = computed(() => {
   const { limite, gastado_mes } = limiteInfo.value
@@ -878,6 +935,41 @@ async function guardarLimite() {
     guardandoLimite.value = false
   }
 }
+
+// /// [H3 - Control y libertad del usuario: restablecer o quitar el límite mensual] ///
+async function quitarLimite() {
+  quitandoLimite.value = true
+  errorLimite.value = ''
+  try {
+    const res = await fetch(`${API_URL}/limite`, {
+      method: 'DELETE',
+      headers: authHeaders()
+    })
+    if (res.status === 401) return sesionExpirada()
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      errorLimite.value = data.detail || 'No se pudo quitar el límite.'
+      return
+    }
+    limiteInfo.value = await res.json()
+    cerrarModalLimite()
+    mostrarAvisoEstado('Se eliminó tu límite mensual. Ahora puedes gastar sin restricción.')
+  } catch (e) {
+    errorLimite.value = 'No se pudo conectar con el servidor para quitar el límite.'
+  } finally {
+    quitandoLimite.value = false
+  }
+}
+// /// ============================================================================== ///
+
+// /// [H9 - Reconocer, diagnosticar y recuperarse de errores: acción constructiva en 1 clic] ///
+function ajustarMontoAlDisponible() {
+  if (limiteInfo.value.disponible !== null && limiteInfo.value.disponible > 0) {
+    cantidadGasto.value = Number(limiteInfo.value.disponible.toFixed(2))
+    errorMsgGasto.value = ''
+  }
+}
+// /// ===================================================================================== ///
 
 // Gastos (pagados y pendientes) ya registrados en el mes de una fecha AAAA-MM-DD
 function gastosDelMesDe(fechaISO, excluirId = null) {
@@ -1092,6 +1184,21 @@ const categoriaGasto = ref('')
 
 // Categorías del tipo elegido (las mismas que existen en la base de datos)
 const categoriasDelFormulario = computed(() => categorias.value.filter(c => c.tipo === tipoGasto.value))
+
+// /// [H5 - Prevención de errores: cálculo reactivo de exceso al escribir] ///
+const excesoPreventivoGasto = computed(() => {
+  if (tipoGasto.value !== 'gasto' || limiteInfo.value.limite === null || !cantidadGasto.value) return 0
+  const diaNum = parseInt(diaGasto.value || 1, 10)
+  const diaStr = String(diaNum).padStart(2, '0')
+  const mesIdx = mesesDisponibles.indexOf(mesGasto.value) + 1
+  const mesStr = String(mesIdx > 0 ? mesIdx : 10).padStart(2, '0')
+  const fechaISO = `2026-${mesStr}-${diaStr}`
+  const gastado = gastosDelMesDe(fechaISO)
+  const total = Number((gastado + Number(cantidadGasto.value)).toFixed(2))
+  const limite = Number(limiteInfo.value.limite)
+  return total > limite ? Number((total - limite).toFixed(2)) : 0
+})
+// /// ================================================================== ///
 
 watch(categoriasDelFormulario, (lista) => {
   if (!lista.some(c => c.nombre === categoriaGasto.value)) {
@@ -2509,6 +2616,7 @@ onUnmounted(() => {
   border-left: 3px solid #DC2626;
 }
 
+/* /// [H4 - Consistencia y estándares: estilo uniforme y accesible de botones y modales] /// */
 .dashboard-modal-actions {
   display: flex;
   justify-content: flex-end;
@@ -2553,10 +2661,139 @@ onUnmounted(() => {
   opacity: 0.6;
   cursor: not-allowed;
 }
+/* /// =================================================================================== /// */
 
 @media (max-width: 900px) {
   .summary-cards-grid {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- MEJORA IHC CLASE 15: CONTEXTO DE LÍMITE EN MODAL DE GASTO (H6 Y H5) --- */
+.limite-contexto-modal {
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.limite-contexto-cabecera {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.limite-contexto-label {
+  font-weight: 700;
+  color: #1E3350;
+  font-size: 13px;
+}
+
+.limite-contexto-badge {
+  font-size: 12px;
+  font-weight: 700;
+  padding: 3px 9px;
+  border-radius: 12px;
+}
+
+.badge-disp-ok {
+  background-color: #DCFCE7;
+  color: #15803D;
+  border: 1px solid #86EFAC;
+}
+
+.badge-disp-alerta {
+  background-color: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FCA5A5;
+}
+
+.limite-contexto-detalle {
+  font-size: 11.5px;
+  color: #64748B;
+  margin-bottom: 2px;
+}
+
+.aviso-exceso-preventivo {
+  font-size: 12px;
+  color: #B91C1C;
+  margin: 6px 0 0 0;
+  background-color: #FEF2F2;
+  border: 1px solid #FECACA;
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+
+.aviso-queda-preventivo {
+  font-size: 12px;
+  color: #15803D;
+  margin: 6px 0 0 0;
+  background-color: #F0FDF4;
+  border: 1px solid #BBF7D0;
+  border-radius: 6px;
+  padding: 6px 10px;
+  line-height: 1.4;
+}
+
+/* /// [H3 - Control y libertad del usuario: botón secundario para quitar límite] /// */
+.btn-quitar-limite {
+  background-color: #FEE2E2;
+  color: #B91C1C;
+  border: 1px solid #FCA5A5;
+  border-radius: 8px;
+  padding: 9px 14px;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-right: auto;
+}
+
+.btn-quitar-limite:hover:not(:disabled) {
+  background-color: #FECACA;
+  color: #991B1B;
+}
+/* /// ========================================================================== /// */
+
+/* /// [H9 - Reconocer, diagnosticar y recuperarse de errores: caja de error y botón de ajuste] /// */
+.caja-error-recuperable {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.texto-error-bloqueo {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.acciones-recuperacion-error {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+
+.btn-recuperar-disponible {
+  background-color: #FFFFFF;
+  color: #B91C1C;
+  border: 1.5px solid #F87171;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.btn-recuperar-disponible:hover {
+  background-color: #FEF2F2;
+  border-color: #DC2626;
+  color: #991B1B;
+}
+/* /// ======================================================================================= /// */
 </style>

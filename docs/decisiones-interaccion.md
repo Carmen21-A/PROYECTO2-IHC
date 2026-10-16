@@ -54,7 +54,8 @@ Se implementó una propiedad computada reactiva y un bloque visual de retroalime
    - **Ámbar / Alerta:** `⚠️ Atención: Con este límite no tendrás disponible (ya llevas gastado X.XX Bs).`
 
 ### 3.2 Evidencia del Después (Corrección Obligatoria)
-- **Captura:** `docs/evidencias/clase-16/carga-cognitiva-despues.png`
+- **Captura:** `docs/evidencias/clase-16/carga-cognitiva-despues.png`  
+  ![Corrección Carga Cognitiva](evidencias/clase-16/carga-cognitiva-despues.png)
 - **Resultado:** El usuario tipea el monto deseado y ve inmediatamente cuánto saldo disponible tendrá sin hacer ningún cálculo mental.
 
 ---

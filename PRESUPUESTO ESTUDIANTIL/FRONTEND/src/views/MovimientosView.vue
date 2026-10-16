@@ -582,6 +582,17 @@
             </div>
           </div>
 
+          <!-- /// [Carga Cognitiva - Clase 16: Proyección del disponible en tiempo real] /// -->
+          <div v-if="nuevoDisponibleEstimado && !errorLimite" class="limite-proyeccion-caja">
+            <p v-if="nuevoDisponibleEstimado.disponible > 0" class="proyeccion-disponible-ok">
+              ✓ Con este límite tendrás <strong>{{ nuevoDisponibleEstimado.disponible.toFixed(2) }} Bs</strong> disponibles este mes.
+            </p>
+            <p v-else class="proyeccion-disponible-alerta">
+              ⚠️ Atención: Este límite no te deja saldo disponible (ya gastaste {{ nuevoDisponibleEstimado.gastado.toFixed(2) }} Bs).
+            </p>
+          </div>
+          <!-- /// ========================================================================= /// -->
+
           <p v-if="errorLimite" id="error-limite" class="form-error-custom" role="alert">{{ errorLimite }}</p>
 
           <div class="dashboard-modal-actions">
@@ -877,6 +888,22 @@ const limiteEscrito = ref('')
 const errorLimite = ref('')
 const guardandoLimite = ref(false)
 const quitandoLimite = ref(false)
+
+// /// [Carga Cognitiva - Clase 16: Proyección reactiva del disponible al escribir el límite] ///
+const nuevoDisponibleEstimado = computed(() => {
+  const gastado = Number(limiteInfo.value.gastado_mes || 0)
+  const texto = String(limiteEscrito.value || '').trim().replace(',', '.')
+  if (!texto) return null
+  const num = parseFloat(texto)
+  if (isNaN(num) || num <= 0) return null
+  const disponible = Number((num - gastado).toFixed(2))
+  return {
+    disponible,
+    esMenorOIgual: num <= gastado,
+    gastado
+  }
+})
+// /// ========================================================================================= ///
 
 const porcentajeLimite = computed(() => {
   const { limite, gastado_mes } = limiteInfo.value
@@ -2796,4 +2823,32 @@ onUnmounted(() => {
   color: #991B1B;
 }
 /* /// ======================================================================================= /// */
+
+/* /// [Carga Cognitiva - Clase 16: Estilos de la proyección reactiva en modal de límite] /// */
+.limite-proyeccion-caja {
+  margin: 12px 0 6px 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.proyeccion-disponible-ok {
+  background-color: #E6F4EA;
+  color: #137333;
+  border-left: 4px solid #34A853;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+.proyeccion-disponible-alerta {
+  background-color: #FEF7E0;
+  color: #B06000;
+  border-left: 4px solid #FBBC04;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+/* /// =================================================================================== /// */
 </style>

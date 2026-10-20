@@ -4,6 +4,7 @@ import LoginView from '../views/LoginView.vue'
 import RegisterView from '../views/RegisterView.vue'
 import RecuperarView from '../views/RecuperarView.vue'
 import MovimientosView from '../views/MovimientosView.vue'
+import HistorialView from '../views/HistorialView.vue'
 
 const routes = [
   {
@@ -34,6 +35,12 @@ const routes = [
     path: '/movimientos',
     name: 'Movimientos',
     component: MovimientosView,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/historial',
+    name: 'Historial',
+    component: HistorialView,
     meta: { requiresAuth: true }
   },
   {

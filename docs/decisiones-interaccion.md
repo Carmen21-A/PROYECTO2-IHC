@@ -69,3 +69,83 @@ Se implementó una propiedad computada reactiva y un bloque visual de retroalime
 2. **Commit 2:**  
    `fix: aplicar mejora de interacción`  
    *Aplica la lógica reactiva en `MovimientosView.vue` y añade la captura del después en `docs/evidencias/clase-16/carga-cognitiva-despues.png`.*
+
+
+---
+---
+
+
+
+
+
+
+
+---
+---
+
+---
+---
+
+---
+---
+
+
+# Tarea 4: Historial del mes — Decisiones de interacción
+
+**Issue principal:** #12 — *Historial del mes: ¿Qué movimientos tuvo el mes?*
+**Pregunta que responde:** ¿Qué movimientos tuvo el mes?
+
+> *"El historial convierte acciones aisladas en una trayectoria visible."* La pantalla nueva `/historial` muestra, por cada movimiento, **qué ocurrió** (descripción y tipo), **cuándo** (agrupado por día), **cuál fue el resultado** (monto con signo y estado con texto) y **qué elemento estuvo involucrado** (categoría).
+
+## Cómo funciona (de los datos a la pantalla)
+
+| Capa | Qué hace | Código |
+|---|---|---|
+| Datos | Usa los movimientos guardados en la tabla `movimientos` (no datos de ejemplo). Valida el mes, agrupa por día y calcula ingresos, gastos y balance. | `PRESUPUESTO ESTUDIANTIL/BACKEND/historial_mes.py` (`mes_desde_texto` L21, `consultar_historial` L32, `agrupar_por_dia` L38, `resumen_del_mes` L48) |
+| Consulta | `GET /movimientos/historial?mes=AAAA-MM`, siempre filtrado por el usuario que inició sesión y del más reciente al más antiguo. | `PRESUPUESTO ESTUDIANTIL/BACKEND/routers/movimientos.py` L165 |
+| Interfaz | Vista "Historial del mes". El mes queda en la URL (`?mes=2026-09`), así al recargar se ve el mismo mes. | `PRESUPUESTO ESTUDIANTIL/FRONTEND/src/views/HistorialView.vue` |
+| Pruebas | 15 pruebas: mes correcto (día 1 y último día), orden, usuario correcto, resumen, mes vacío, mes inválido y "registrar → aparece en el historial". | `PRESUPUESTO ESTUDIANTIL/BACKEND/tests/test_historial_mes.py` |
+
+---
+
+## Decisión 1 · Ley de Fitts (alcanzar)
+
+| | |
+|---|---|
+| **Antes** | ![Fitts antes](evidencias/tarea-4/fitts-antes.png) |
+| **Hallazgo** | Para ver los movimientos del mes había que hacer **3 clics en objetivos pequeños**: botón "Filtros" → select "Periodo" → opción "Este mes". La lista desplegable tiene opciones de unos 20 px de alto, en la esquina derecha y lejos de la lista. |
+| **Decisión** | El historial tiene una **entrada directa y grande**: enlace "Historial" siempre visible en la barra (toda el área de 44 px es clicable, no solo el texto) y botón "Ver historial del mes →" de 48 px junto al título de Mis Movimientos. El cambio de mes usa flechas ‹ › de **48 × 48 px pegadas al nombre del mes**, y "Volver a <mes actual>" aparece justo debajo cuando se navega a otro mes. |
+| **Después** | ![Fitts después](evidencias/tarea-4/fitts-despues.png) |
+| **Código** | `FRONTEND/src/App.vue` L13-14 (enlace Historial) y estilo `.nav-item-white` · `FRONTEND/src/views/MovimientosView.vue` L7-8 (botón "Ver historial del mes") · `FRONTEND/src/views/HistorialView.vue` L8-18 (flechas de mes) y L228 (`.btn-mes` 48 px) |
+| **Justificación** | *"El objetivo pequeño y distante exigía precisión. Aumentamos el área y acercamos la acción a los datos."* De 3 clics precisos se pasa a 1 clic en un objetivo grande. |
+
+## Decisión 2 · Ley de Hick (elegir)
+
+| | |
+|---|---|
+| **Antes** | ![Hick antes](evidencias/tarea-4/hick-antes.png) |
+| **Hallazgo** | Al abrir "Filtros" aparecen **4 selects a la vez** (Tipo, Categoría, Estado, Periodo) con varias opciones cada uno, y el periodo por defecto es "Todo el tiempo". Para responder "¿qué movimientos tuvo el mes?" la persona debe comparar y decidir entre todos ellos. |
+| **Decisión** | El historial **abre ya en el mes actual** (no hay que elegir periodo) y solo deja **3 opciones visibles**: `Todos · Ingresos · Gastos`. Categoría y estado no compiten como filtros: se leen en cada movimiento. Los filtros avanzados siguen disponibles en Mis Movimientos (agrupar no es eliminar capacidades). |
+| **Después** | ![Hick después](evidencias/tarea-4/hick-despues.png) |
+| **Código** | `FRONTEND/src/views/HistorialView.vue` L54-65 (botones segmentados) y `OPCIONES_TIPO` / `diasVisibles` en el `<script>` |
+| **Justificación** | De 4 decisiones simultáneas se pasa a 1 sola decisión con 3 alternativas, y la opción más frecuente (el mes actual, todos los movimientos) ya viene elegida. |
+
+## Decisión 3 · Carga cognitiva (comprender)
+
+| | |
+|---|---|
+| **Antes** | ![Carga cognitiva antes](evidencias/tarea-4/carga-cognitiva-antes.png) |
+| **Hallazgo** | La lista mezcla meses ("4 de Octubre" y "1 de Septiembre" juntos). Para saber qué pasó en el mes hay que leer cada fecha y recordar las tarjetas de arriba, que además no coinciden con lo que se ve (dice *Ingresos del Mes 0.00 Bs* mientras la lista muestra +700 Bs de septiembre). |
+| **Decisión** | Cada mes se ve por separado y **los movimientos se agrupan por día** ("Lunes 19 de octubre"). El **resumen del mes** (Ingresos · Gastos · Balance) está junto a la lista y se calcula con los mismos movimientos que se ven. Cada movimiento muestra primero lo necesario: descripción, `Gasto · Categoría`, monto con signo (+ / −) y **estado con texto** (Pagado / Pendiente / Recibido), no solo con color. |
+| **Después** | ![Carga cognitiva después](evidencias/tarea-4/carga-cognitiva-despues.png) |
+| **Código** | `FRONTEND/src/views/HistorialView.vue` L23-43 (resumen del mes), L71-91 (agrupación por día) y `textoEstado` L148 · `BACKEND/historial_mes.py` `agrupar_por_dia` L38 y `resumen_del_mes` L48 |
+| **Justificación** | La persona ya no tiene que recordar datos de otra parte de la pantalla ni filtrar fechas con la mente: la interfaz le muestra el mes, sus días y su balance en el mismo lugar. |
+
+---
+
+## Estado vacío orientador
+
+Si el mes no tiene movimientos se muestra *"No registraste movimientos en <mes>"*, una explicación breve y el botón **"+ Registrar movimiento"**, que lleva a Mis Movimientos con el formulario ya abierto.
+
+- **Captura:** ![Estado vacío](evidencias/tarea-4/estado-vacio.png)
+- **Código:** `FRONTEND/src/views/HistorialView.vue` L46-51 y `irARegistrar()` · `FRONTEND/src/views/MovimientosView.vue` `onMounted` (abre el formulario con `?registrar=1`)

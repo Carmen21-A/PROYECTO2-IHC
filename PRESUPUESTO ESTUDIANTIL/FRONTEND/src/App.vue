@@ -9,7 +9,9 @@
           </router-link>
           <nav class="nav-links-white">
             <router-link to="/" class="nav-item-white">Inicio</router-link>
-            <router-link to="/movimientos" class="nav-item-white active">Mis Movimientos</router-link>
+            <router-link to="/movimientos" class="nav-item-white" active-class="active">Mis Movimientos</router-link>
+            <!-- /// [Fitts: entrada al historial siempre visible en la barra, con área de clic amplia] /// -->
+            <router-link to="/historial" class="nav-item-white" active-class="active">Historial</router-link>
           </nav>
         </div>
 
@@ -71,7 +73,7 @@ const primerNombre = computed(() => nombreUsuario.value.trim().split(' ')[0])
 const inicialUsuario = computed(() => nombreUsuario.value.trim().charAt(0).toUpperCase())
 
 const esRutaPrivada = computed(() => {
-  return route.path === '/movimientos'
+  return route.path === '/movimientos' || route.path === '/historial'
 })
 
 function cargarUsuario() {
@@ -147,20 +149,27 @@ onMounted(() => {
 
 .nav-links-white {
   display: flex;
-  gap: clamp(24px, 2vw, 40px);
+  gap: clamp(8px, 1vw, 20px);
 }
 
+/* Toda el área del enlace es clicable (mín. 44 px de alto), no solo el texto */
 .nav-item-white {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 clamp(10px, 0.9vw, 16px);
+  border-radius: 8px;
   color: #E2E8F0;
   font-size: clamp(14px, 0.95vw, 17px);
   font-weight: 400;
   text-decoration: none;
-  transition: color 0.2s;
+  transition: color 0.2s, background 0.2s;
 }
 
 .nav-item-white:hover, .nav-item-white.active {
   color: #FFFFFF;
   font-weight: 500;
+  background: rgba(255, 255, 255, 0.1);
 }
 
 .nav-right {

@@ -4,6 +4,8 @@
 
       <div class="dashboard-header">
         <h1 class="page-title">Mis Movimientos</h1>
+        <!-- Issue #12 [Fitts]: acceso grande y cercano al historial del mes -->
+        <router-link v-if="!esDemo" to="/historial" class="btn-historial">Ver historial del mes →</router-link>
       </div>
 
       <div v-if="esDemo" class="demo-banner">
@@ -1614,6 +1616,12 @@ if (canalPestanas) {
 onMounted(() => {
   cargarMovimientos()
   cargarCategorias()
+  // Viene del estado vacío del historial (Issue #12): abre directo el formulario
+  if (route.query.registrar) {
+    abrirModal.value = true
+    const { registrar, ...resto } = route.query
+    router.replace({ query: resto })
+  }
   document.addEventListener('visibilitychange', mostrarAvisosPendientes)
 })
 
@@ -1637,6 +1645,29 @@ onUnmounted(() => {
 
 .dashboard-header {
   margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.btn-historial {
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 22px;
+  border-radius: 8px;
+  border: 1px solid #3B6EA5;
+  background: #FFFFFF;
+  color: #1E3350;
+  font-size: 16px;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.btn-historial:hover {
+  background: #E0ECF8;
 }
 
 .page-title {

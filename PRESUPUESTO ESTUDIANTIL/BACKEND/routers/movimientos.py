@@ -9,6 +9,7 @@ from security import get_current_user
 from reglas_presupuesto import validar_gasto_con_limite
 from routers.limite import gastos_del_mes, limite_del_usuario
 from filtros_movimientos import crear_filtros, consultar_movimientos, calcular_totales
+from historial_mes import mes_desde_texto, consultar_historial, armar_historial
 from saldo import calcular_resumen, validar_pago_con_saldo, validar_quitar_ingreso, saldo_actual
 
 router = APIRouter(prefix="/movimientos", tags=["Movimientos Estudiantiles"])
@@ -157,6 +158,24 @@ def filtrar_movimientos(
 
     movimientos = [serializar_movimiento(m, db) for m in consultar_movimientos(db, usuario.id, filtros)]
     return {"movimientos": movimientos, **calcular_totales(movimientos)}
+
+
+#endpoint GET /movimientos/historial?mes=AAAA-MM: el historial de un mes
+# (sin mes, el mes actual), solo del usuario que inició sesión.
+@router.get("/historial", response_model=schemas.HistorialMes)
+def historial_del_mes(
+    mes: Optional[str] = None,
+    db: Session = Depends(get_db),
+    usuario: models.Usuario = Depends(get_current_user)
+):
+    """Issue #12: ¿Qué movimientos tuvo el mes? Resumen del mes y movimientos agrupados por día."""
+    try:
+        primer_dia = mes_desde_texto(mes, date.today())
+    except ValueError as err:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(err))
+
+    movimientos = [serializar_movimiento(m, db) for m in consultar_historial(db, usuario.id, primer_dia)]
+    return armar_historial(movimientos, primer_dia)
 
 
 #endpoint POST /movimientos: el que crea un movimiento nuevo

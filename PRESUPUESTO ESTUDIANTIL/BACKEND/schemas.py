@@ -78,6 +78,22 @@ class ResultadoFiltro(BaseModel):
     total_ingresos: float
     total_gastos: float
 
+class ResumenHistorial(BaseModel):
+    cantidad: int
+    ingresos: float
+    gastos: float
+    balance: float
+
+class DiaHistorial(BaseModel):
+    fecha: str
+    movimientos: List[MovimientoOut]
+
+class HistorialMes(BaseModel):
+    mes: str
+    mes_texto: str
+    resumen: ResumenHistorial
+    dias: List[DiaHistorial]
+
 class CategoriaOut(BaseModel):
     id: int
     nombre: str
